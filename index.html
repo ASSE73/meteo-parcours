@@ -7,11 +7,11 @@
 <title>Météo Parcours</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=Michroma&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
-/* Direction : identité Emotion Ridge (blanc, noir, rouge #B3121C, Michroma) passée au filtre Maurten :
+/* Direction façon Maurten :
    page blanche, encre noire, chiffres très grands, filets fins, aucune carte ni ombre.
    La couleur ne sert qu'aux données (pente, pluie, vent, température). Thème clair assumé. */
 :root{
@@ -21,7 +21,6 @@
   --rain:#2B6CB0; --rain-soft:#E3EDF7; --warm:#C8402C; --cold:#2F66B3;
   --head:#C8402C; --tail:#2E7D52; --night:rgba(11,11,11,.05); --field:#FFFFFF;
   --warn-bg:#F6F6F6; --warn-ink:#0B0B0B;
-  --f-wide:"Michroma","Eurostile","Arial",sans-serif;
   --f-num:"Inter Tight","Inter",system-ui,sans-serif;
   --f-body:"Inter",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
   --f-display:var(--f-num);
@@ -37,8 +36,8 @@ body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);-webkit-f
 
 /* en-tête */
 header.top{max-width:1360px;margin:0 auto 40px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px 40px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--line)}
-.eyebrow{font:400 .66rem/1 var(--f-wide);letter-spacing:.32em;text-transform:uppercase;color:var(--accent);margin:0 0 14px}
-h1{font:400 clamp(1.7rem,4vw,2.7rem)/1 var(--f-wide);letter-spacing:.06em;text-transform:uppercase;margin:0}
+.eyebrow{font:600 .66rem/1 var(--f-body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+h1{font:700 clamp(2rem,4.6vw,3.4rem)/.95 var(--f-num);letter-spacing:-.045em;margin:0}
 .tag{color:var(--muted);font-size:.92rem;max-width:40ch;margin:0;text-wrap:balance}
 
 /* blocs : pas de cartes, des filets */
@@ -82,8 +81,8 @@ details{border-top:1px solid var(--hair);padding-top:16px}
 summary{cursor:pointer;font-weight:600;font-size:.82rem;letter-spacing:.04em}
 details .inner{display:flex;flex-direction:column;gap:16px;margin-top:14px}
 .hint{font-size:.78rem;color:var(--muted);margin:6px 0 0}
-.go{background:var(--ink);color:#fff;border:0;border-radius:0;padding:15px;font:400 .72rem/1 var(--f-wide);letter-spacing:.24em;text-transform:uppercase;cursor:pointer;transition:background .15s}
-.go:hover{background:var(--accent)}
+.go{background:var(--ink);color:#fff;border:0;border-radius:0;padding:16px;font:600 .95rem/1 var(--f-num);letter-spacing:-.01em;cursor:pointer;transition:background .15s}
+.go:hover{background:#2A2A2A}
 .go:disabled{opacity:.3;cursor:default;background:var(--ink)}
 .linkbtn{background:none;border:0;padding:0;color:var(--ink);cursor:pointer;text-decoration:underline;text-underline-offset:3px;font-size:.84rem;text-align:left}
 
@@ -110,7 +109,7 @@ main{display:flex;flex-direction:column;gap:44px;min-width:0}
 .stat .v{font:600 clamp(2.2rem,4.4vw,3.5rem)/.95 var(--f-num);letter-spacing:-.045em;font-variant-numeric:tabular-nums;margin-bottom:10px}
 .stat .v small{font-size:.38em;font-weight:500;letter-spacing:0;color:var(--muted);margin-left:3px}
 .stat .s{font-size:.8rem;color:var(--muted)}
-.reli{display:inline-block;font:400 .56rem/1 var(--f-wide);letter-spacing:.18em;text-transform:uppercase;padding:4px 7px;border:1px solid var(--ink);color:var(--ink);margin-left:4px;vertical-align:1px}
+.reli{display:inline-block;font:600 .6rem/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;padding:4px 7px;border:1px solid var(--ink);color:var(--ink);margin-left:4px;vertical-align:1px}
 .alerts{display:flex;flex-wrap:wrap;gap:8px;margin-top:-24px}
 .chip{font-size:.8rem;padding:6px 12px;border:1px solid var(--ink);border-radius:99px;background:transparent}
 .chip.rain{border-color:var(--rain);color:var(--rain)}
@@ -118,7 +117,7 @@ main{display:flex;flex-direction:column;gap:44px;min-width:0}
 .chip.cold{border-color:var(--cold);color:var(--cold)}
 .chip.night{border-color:var(--hair);color:var(--muted)}
 .sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px 24px;flex-wrap:wrap;margin-bottom:20px}
-.sec-h h3{font:400 .78rem/1.2 var(--f-wide);letter-spacing:.22em;text-transform:uppercase;margin:0}
+.sec-h h3{font:700 clamp(1.5rem,2.6vw,2rem)/1 var(--f-num);letter-spacing:-.035em;margin:0}
 .legend{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);align-items:center}
 .legend i{display:inline-block;width:12px;height:8px;vertical-align:middle;margin-right:6px}
 
