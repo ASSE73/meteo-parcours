@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Météo Parcours</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=DM+Sans:opsz,wght@9..40,400..700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+/* Layout : en-tête éditorial, colonne de réglages collante à gauche, résultats à droite ; une colonne sur téléphone.
+   Même langage que les documents Emotion Ridge : papier chaud, encre bleu nuit, accent terracotta, Garamond + DM Sans. */
+:root{
+  --bg:#F5F1E8; --panel:#FBF9F4; --ink:#1F2A37; --muted:#5B6470; --line:#E2DBCB; --line-soft:#ECE6D9;
+  --accent:#B8432F; --accent-ink:#FBF9F4;
+  --navy:#1F2A37; --navy-ink:#F5F1E8; --navy-muted:#C9CED6; --navy-line:#34404F;
+  --rain:#2F6FB3; --rain-soft:#D6E3F0; --warm:#B8432F; --cold:#3A6FB0;
+  --head:#B8432F; --tail:#3F7F5A; --night:rgba(31,42,55,.065); --field:#FFFFFF;
+  --warn-bg:#F3E3C7; --warn-ink:#6B4A12;
+  --f-display:"EB Garamond",Georgia,"Times New Roman",serif;
+  --f-body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131920; --panel:#1A222B; --ink:#EDE7DA; --muted:#9AA3AE; --line:#2C3642; --line-soft:#232C36;
+    --accent:#E07A5F; --accent-ink:#131920;
+    --navy:#0E1319; --navy-ink:#EDE7DA; --navy-muted:#9AA3AE; --navy-line:#26303B;
+    --rain:#6FA4DA; --rain-soft:#1E3247; --warm:#E07A5F; --cold:#7FA6DA;
+    --head:#E07A5F; --tail:#6DBA8C; --night:rgba(255,255,255,.045); --field:#131920;
+    --warn-bg:#3A2F18; --warn-ink:#EBCB8B;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);-webkit-font-smoothing:antialiased;
+  padding:32px max(16px,env(safe-area-inset-right,0px)) 56px max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:320px minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:920px){.wrap{grid-template-columns:minmax(0,1fr)}}
+header.top{max-width:1280px;margin:0 auto 28px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px 32px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:22px}
+.eyebrow{font:600 .72rem/1 var(--f-body);letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+h1{font:500 clamp(2.4rem,5vw,3.6rem)/1 var(--f-display);margin:0;letter-spacing:-.01em}
+.tag{color:var(--muted);font-size:1rem;max-width:42ch;margin:0;text-wrap:balance}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+@media (max-width:520px){.card{padding:18px 16px}}
+aside.card{position:sticky;top:20px;display:flex;flex-direction:column;gap:18px}
+@media (max-width:920px){aside.card{position:static}}
+.label{font:600 .7rem/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;display:block}
+input,select,button{font:inherit;color:inherit}
+input[type=number],input[type=datetime-local],select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--field);font-variant-numeric:tabular-nums}
+input:focus-visible,select:focus-visible,button:focus-visible,.drop:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.drop{position:relative;border:1px dashed color-mix(in srgb,var(--muted) 45%,transparent);border-radius:12px;padding:18px 14px;text-align:center;cursor:pointer;display:block;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.drop strong{display:block;font:500 1.2rem/1.2 var(--f-display)}
+.drop-ico{display:none}
+.drop.loaded{border:1.5px solid var(--tail);background:color-mix(in srgb,var(--tail) 8%,var(--panel));text-align:left;display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center}
+.drop.loaded .drop-ico{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--tail);color:var(--panel);grid-row:span 2}
+.drop.loaded strong{font-size:1.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drop.flash{animation:flash .9s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--tail) 55%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
+.drop.bad{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--panel))}
+.routehead{display:flex;justify-content:space-between;align-items:baseline;gap:6px 20px;flex-wrap:wrap}
+.routehead h2{font:500 clamp(1.5rem,3vw,2.1rem)/1.1 var(--f-display);margin:0;min-width:0;overflow-wrap:anywhere}
+.routehead span{color:var(--muted);font-size:.92rem;font-variant-numeric:tabular-nums}
+#out.busy>*{opacity:.45;transition:opacity .2s;pointer-events:none}
+.loading{display:flex;align-items:center;gap:12px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.drop.flash{animation:none}}
+.drop small{color:var(--muted)}
+.routeinfo{font-size:.88rem;color:var(--muted)}
+.routeinfo b{color:var(--ink);font-weight:600}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border:1px solid var(--line);border-radius:11px;background:var(--bg)}
+.seg button{border:0;background:transparent;padding:7px 4px;cursor:pointer;font-weight:500;border-radius:8px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--navy);color:var(--navy-ink)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dur{display:flex;gap:8px;align-items:center}
+.dur input{flex:1}
+.dur span{color:var(--muted);font-size:.9rem}
+details{border-top:1px solid var(--line);padding-top:14px}
+summary{cursor:pointer;font-weight:600;font-size:.88rem}
+details .inner{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.hint{font-size:.8rem;color:var(--muted);margin:4px 0 0}
+.go{background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;padding:13px;font:600 .92rem/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:filter .15s}
+.go:hover{filter:brightness(1.07)}
+.go:disabled{opacity:.45;cursor:default;filter:none}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-size:.86rem;text-align:left}
+main{display:flex;flex-direction:column;gap:20px;min-width:0}
+.msg{padding:14px 16px;border-radius:12px;background:var(--warn-bg);color:var(--warn-ink);font-size:.92rem}
+.msg[data-kind=err]{background:color-mix(in srgb,var(--accent) 13%,var(--panel));color:var(--ink);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+.empty{padding:56px 24px;text-align:center;color:var(--muted)}
+.empty h2{font:500 2rem/1.1 var(--f-display);color:var(--ink);margin:0 0 10px;text-wrap:balance}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--navy);color:var(--navy-ink);border-radius:16px;padding:18px 20px;min-width:0}
+.stat .s{font-size:.82rem;color:var(--navy-muted)}
+.stat .k{font:600 .68rem/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--navy-muted);margin-bottom:8px}
+.stat .v{font:500 2.3rem/1.05 var(--f-display);font-variant-numeric:lining-nums tabular-nums;margin-bottom:6px}
+.stat .v small{white-space:nowrap}
+@media (max-width:520px){.stats{grid-template-columns:1fr 1fr;gap:8px}.stat{padding:14px}.stat .v{font-size:1.8rem}}
+.stat .v small{font-size:.55em;color:var(--navy-muted);margin-left:2px}
+.reli{display:inline-block;font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid var(--navy-line);color:var(--navy-ink);margin-left:4px;vertical-align:1px}
+.alerts{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:.84rem;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--panel)}
+.chip b{font-weight:600}
+.chip.rain{border-color:color-mix(in srgb,var(--rain) 50%,transparent);color:var(--rain)}
+.chip.head{border-color:color-mix(in srgb,var(--head) 50%,transparent);color:var(--head)}
+.chip.cold{border-color:color-mix(in srgb,var(--cold) 50%,transparent);color:var(--cold)}
+.chip.night{color:var(--muted)}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px 20px;flex-wrap:wrap;margin-bottom:14px}
+.sec-h h3{font:500 1.65rem/1.1 var(--f-display);margin:0}
+.legend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:12px;height:8px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.chartbox{position:relative}
+#chart{width:100%;height:auto;display:block;touch-action:pan-y;overflow:visible}
+#chart text{font-family:var(--f-body);fill:var(--muted)}
+#chart .pt{font:600 10.5px var(--f-body);letter-spacing:.12em;text-transform:uppercase;fill:var(--ink)}
+#chart .pk{font:500 13px var(--f-display);fill:var(--ink)}
+#chart .ann{font:600 11px var(--f-body);fill:var(--ink)}
+.tip{position:absolute;pointer-events:none;background:var(--navy);color:var(--navy-ink);font-size:.8rem;padding:10px 12px;border-radius:10px;line-height:1.45;white-space:nowrap;box-shadow:0 8px 24px rgba(15,20,27,.25);z-index:2}
+.tip b{font:500 1.05rem var(--f-display)}
+.tip .m{color:var(--navy-muted)}
+#map{height:min(560px,70vh);min-height:340px;border-radius:12px;border:1px solid var(--line);z-index:0}
+.mapctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;font-size:.86rem}
+.mapctl select{width:auto;padding:6px 9px}
+.ck{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.ck input{accent-color:var(--accent)}
+.maplegend{margin-top:10px}
+.ramp{display:inline-block;width:160px;max-width:40vw;height:8px;border-radius:4px}
+.wind-ico,.sky-ico{background:none;border:0}
+.wind-ico svg{display:block;filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff)}
+.sky-ico{display:flex!important;flex-direction:column;align-items:center;line-height:1}
+.sky-ico span{width:30px;height:30px;border-radius:50%;background:#FBF9F4;box-shadow:0 1px 3px rgba(0,0,0,.35);display:grid;place-items:center;font-size:17px}
+.sky-ico b{margin-top:2px;font:600 11px/1 "DM Sans",sans-serif;color:#1F2A37;background:#FBF9F4;padding:1px 4px;border-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.leaflet-container{font-family:var(--f-body)!important}
+.tablewrap{overflow-x:auto;margin:0 -4px}
+table{border-collapse:collapse;width:100%;font-size:.87rem;font-variant-numeric:tabular-nums}
+th{font-weight:600;text-align:left;color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+tbody tr:hover td{background:color-mix(in srgb,var(--ink) 3%,transparent)}
+tr.wet td{background:color-mix(in srgb,var(--rain-soft) 55%,transparent)}
+tr.isnight td:first-child{box-shadow:inset 3px 0 0 var(--muted)}
+.wind-rel{display:inline-flex;align-items:center;gap:5px}
+.wind-rel svg{width:16px;height:16px}
+.face{color:var(--head);font-weight:600}.dos{color:var(--tail);font-weight:600}
+.foot{font-size:.78rem;color:var(--muted);line-height:1.5}
+.foot a{color:inherit}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}.go,.drop{transition:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><p class="eyebrow">Vélo · trail · ultra</p><h1>Météo Parcours</h1></div>
+  <p class="tag">La météo que tu vas croiser, point par point, à l'heure exacte où tu y passes.</p>
+</header>
+
+<div class="wrap">
+  <aside class="card" aria-label="Réglages">
+    <div>
+      <span class="label">Trace</span>
+      <label class="drop" id="drop">
+        <input type="file" id="gpx" accept=".gpx,application/gpx+xml,application/xml,text/xml">
+        <span class="drop-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <strong id="drop-t">Importer un fichier GPX</strong>
+        <small id="drop-s">ou le glisser ici (export Strava, Komoot…)</small>
+      </label>
+      <p class="routeinfo" id="routeinfo" style="margin:8px 0 0">Aucune trace. <button class="linkbtn" id="demo" type="button">Charger l'exemple Albertville → Roselend → Bourg-St-Maurice</button></p>
+    </div>
+
+    <div>
+      <span class="label">Activité</span>
+      <div class="seg" role="group" aria-label="Activité">
+        <button type="button" id="act-velo" aria-pressed="true">Vélo</button>
+        <button type="button" id="act-trail" aria-pressed="false">Trail</button>
+      </div>
+    </div>
+
+    <div>
+      <label class="label" for="start">Départ</label>
+      <input type="datetime-local" id="start">
+    </div>
+
+    <div>
+      <span class="label">Allure</span>
+      <div class="seg" role="group" aria-label="Mode d'allure" style="margin-bottom:8px">
+        <button type="button" id="mode-speed" aria-pressed="true">Vitesse moyenne</button>
+        <button type="button" id="mode-time" aria-pressed="false">Temps prévu</button>
+      </div>
+      <div id="box-speed">
+        <div class="dur"><input type="number" id="speed" min="1" max="80" step="0.5" value="25" aria-label="Vitesse moyenne en km/h"><span>km/h</span></div>
+      </div>
+      <div id="box-time" hidden>
+        <div class="dur">
+          <input type="number" id="dh" min="0" max="200" step="1" value="4" aria-label="Heures"><span>h</span>
+          <input type="number" id="dm" min="0" max="59" step="5" value="0" aria-label="Minutes"><span>min</span>
+        </div>
+      </div>
+      <p class="hint" id="pace-hint"></p>
+    </div>
+
+    <details id="adv">
+      <summary>Réglages avancés</summary>
+      <div class="inner">
+        <div>
+          <span class="label">Effet du dénivelé</span>
+          <div class="row2">
+            <div><label class="hint" for="cup">Montée : km en plus / 100 m D+</label><input type="number" id="cup" min="0" max="5" step="0.1" value="1.5"></div>
+            <div><label class="hint" for="cdown">Descente : km gagnés / 100 m D−</label><input type="number" id="cdown" min="0" max="3" step="0.1" value="0.5"></div>
+          </div>
+          <p class="hint">Le temps total reste celui que tu as saisi : ces coefficients répartissent ce temps (plus lent en montée, plus rapide en descente). Mets 0 et 0 pour une vitesse constante. Trail : 1 km par 100 m D+ correspond au km-effort classique.</p>
+        </div>
+        <div>
+          <label class="label" for="model">Modèle météo</label>
+          <select id="model">
+            <option value="best_match">Automatique (meilleur dispo)</option>
+            <option value="meteofrance_seamless">Météo-France (AROME + ARPEGE)</option>
+            <option value="icon_seamless">DWD ICON</option>
+            <option value="ecmwf_ifs025">ECMWF IFS</option>
+            <option value="gfs_seamless">NOAA GFS</option>
+          </select>
+        </div>
+        <div>
+          <label class="label" for="step">Un point météo toutes les</label>
+          <select id="step">
+            <option value="auto">Auto</option>
+            <option value="10">10 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">1 h</option>
+            <option value="120">2 h</option>
+          </select>
+        </div>
+      </div>
+    </details>
+
+    <button class="go" id="go" type="button" disabled>Voir la météo</button>
+  </aside>
+
+  <main id="out">
+    <div class="card empty" id="empty">
+      <h2>Importe une trace pour commencer</h2>
+      <p style="margin:0 auto;max-width:46ch">Exporte ton itinéraire Strava en GPX, choisis ton heure de départ et ta vitesse. Tu verras température, pluie et vent (de face ou de dos) à chaque passage, sur la carte, le profil et dans le tableau.</p>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const R = 6371.0088;
+const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+const fmtH = t => new Date(t).toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}).replace(":", "h");
+const fmtDay = t => new Date(t).toLocaleDateString("fr-FR", {weekday:"short", day:"numeric", month:"short"});
+const fmtDur = ms => { const m = Math.round(ms/60000); return Math.floor(m/60) + "h" + String(m%60).padStart(2,"0"); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const ACT = {
+  velo:  {speed:25, cup:1.5, cdown:0.5, label:"Vélo"},
+  trail: {speed:8,  cup:1.0, cdown:0.0, label:"Trail"}
+};
+const state = {act:"velo", mode:"speed", route:null, last:null};
+
+/* ---------- réglages mémorisés ---------- */
+const store = {
+  get(){ try { return JSON.parse(localStorage.getItem("meteo-parcours") || "{}"); } catch(e){ return {}; } },
+  set(v){ try { localStorage.setItem("meteo-parcours", JSON.stringify(v)); } catch(e){} }
+};
+function saveSettings(){
+  store.set({act:state.act, mode:state.mode, speed:$("#speed").value, dh:$("#dh").value, dm:$("#dm").value,
+    cup:$("#cup").value, cdown:$("#cdown").value, model:$("#model").value, step:$("#step").value,
+    perAct:{...(store.get().perAct||{}), [state.act]:{speed:$("#speed").value, cup:$("#cup").value, cdown:$("#cdown").value}}});
+}
+function setAct(a, applyDefaults){
+  state.act = a;
+  $("#act-velo").setAttribute("aria-pressed", a==="velo");
+  $("#act-trail").setAttribute("aria-pressed", a==="trail");
+  if (applyDefaults){
+    const mem = (store.get().perAct||{})[a] || {};
+    $("#speed").value = mem.speed ?? ACT[a].speed;
+    $("#cup").value = mem.cup ?? ACT[a].cup;
+    $("#cdown").value = mem.cdown ?? ACT[a].cdown;
+  }
+  paceHint();
+}
+function setMode(m){
+  state.mode = m;
+  $("#mode-speed").setAttribute("aria-pressed", m==="speed");
+  $("#mode-time").setAttribute("aria-pressed", m==="time");
+  $("#box-speed").hidden = m!=="speed";
+  $("#box-time").hidden = m!=="time";
+  paceHint();
+}
+function totalMs(){
+  if (!state.route) return null;
+  if (state.mode === "speed"){
+    const v = parseFloat($("#speed").value);
+    return v > 0 ? state.route.km / v * 3600000 : null;
+  }
+  const ms = ((parseFloat($("#dh").value)||0)*60 + (parseFloat($("#dm").value)||0)) * 60000;
+  return ms > 0 ? ms : null;
+}
+function paceHint(){
+  const h = $("#pace-hint");
+  if (!state.route){ h.textContent = ""; return; }
+  const T = totalMs();
+  if (!T){ h.textContent = "Indique une vitesse ou une durée."; return; }
+  const start = startTime();
+  const v = state.route.km / (T/3600000);
+  h.textContent = (state.mode==="speed" ? "Durée estimée " + fmtDur(T) : "Vitesse moyenne " + v.toFixed(1).replace(".",",") + " km/h")
+    + (start ? " · arrivée " + fmtDay(start+T) + " " + fmtH(start+T) : "");
+}
+function startTime(){
+  const v = $("#start").value;
+  if (!v) return null;
+  const t = new Date(v).getTime();
+  return isNaN(t) ? null : t;
+}
+
+/* ---------- GPX ---------- */
+function hav(a, b){
+  const dLat = toRad(b.lat-a.lat), dLon = toRad(b.lon-a.lon);
+  const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1, Math.sqrt(x)));
+}
+function bearing(a, b){
+  const y = Math.sin(toRad(b.lon-a.lon))*Math.cos(toRad(b.lat));
+  const x = Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat)) - Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lon-a.lon));
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+function parseGPX(text){
+  const xml = new DOMParser().parseFromString(text, "application/xml");
+  if (xml.getElementsByTagName("parsererror").length) throw new Error("Ce fichier n'est pas un GPX lisible.");
+  let nodes = [...xml.getElementsByTagNameNS("*", "trkpt")];
+  if (!nodes.length) nodes = [...xml.getElementsByTagNameNS("*", "rtept")];
+  if (nodes.length < 2) throw new Error("Aucun tracé trouvé dans ce GPX (ni trkpt, ni rtept).");
+  const pts = [];
+  for (const n of nodes){
+    const lat = parseFloat(n.getAttribute("lat")), lon = parseFloat(n.getAttribute("lon"));
+    if (!isFinite(lat) || !isFinite(lon)) continue;
+    const e = n.getElementsByTagNameNS("*", "ele")[0];
+    const ele = e ? parseFloat(e.textContent) : NaN;
+    pts.push({lat, lon, ele: isFinite(ele) ? ele : null});
+  }
+  const nm = xml.getElementsByTagNameNS("*", "name")[0];
+  return {pts, name: nm ? nm.textContent.trim() : ""};
+}
+function buildRoute(raw, name){
+  const pts = [];
+  for (const p of raw){
+    const prev = pts[pts.length-1];
+    if (prev){
+      const dd = hav(prev, p);
+      if (dd < 0.002) continue;
+      p.d = prev.d + dd;
+    } else p.d = 0;
+    pts.push(p);
+  }
+  if (pts.length < 2) throw new Error("La trace est trop courte.");
+  const hasEle = pts.filter(p => p.ele !== null).length > pts.length*0.8;
+  // fill missing ele
+  if (hasEle){
+    let last = pts.find(p => p.ele !== null).ele;
+    for (const p of pts){ if (p.ele === null) p.ele = last; else last = p.ele; }
+    // smoothing over ±100 m
+    let lo = 0, hi = 0, sum = 0, cnt = 0;
+    for (let i = 0; i < pts.length; i++){
+      while (hi < pts.length && pts[hi].d <= pts[i].d + 0.1){ sum += pts[hi].ele; cnt++; hi++; }
+      while (pts[lo].d < pts[i].d - 0.1){ sum -= pts[lo].ele; cnt--; lo++; }
+      pts[i].es = sum / cnt;
+    }
+  } else pts.forEach(p => { p.ele = null; p.es = 0; });
+  let up = 0, down = 0;
+  for (let i = 1; i < pts.length; i++){
+    const dz = pts[i].es - pts[i-1].es;
+    if (dz > 0) up += dz; else down -= dz;
+  }
+  return {pts, name, km: pts[pts.length-1].d, up, down, hasEle};
+}
+function demoRoute(){
+  // tracé approximatif, pour la démonstration
+  const W = [[45.6755,6.3925,345],[45.6840,6.4180,480],[45.7110,6.4800,600],[45.7220,6.5270,690],[45.7190,6.5730,740],
+    [45.7060,6.5960,1000],[45.6960,6.6150,1320],[45.6920,6.6400,1605],[45.6840,6.6600,1560],[45.6926,6.6935,1968],
+    [45.6700,6.7300,1500],[45.6450,6.7450,1100],[45.6186,6.7697,810]];
+  const raw = [];
+  for (let i = 0; i < W.length-1; i++){
+    const a = W[i], b = W[i+1], n = 40;
+    for (let k = 0; k < n; k++){ const f = k/n; raw.push({lat:a[0]+(b[0]-a[0])*f, lon:a[1]+(b[1]-a[1])*f, ele:a[2]+(b[2]-a[2])*f}); }
+  }
+  const z = W[W.length-1]; raw.push({lat:z[0], lon:z[1], ele:z[2]});
+  return buildRoute(raw, "Exemple : Albertville → Cormet de Roselend → Bourg-Saint-Maurice (tracé approximatif)");
+}
+function setRoute(r, fileName){
+  state.route = r;
+  const drop = $("#drop");
+  drop.classList.remove("bad", "flash"); void drop.offsetWidth;
+  drop.classList.add("loaded", "flash");
+  $("#drop-t").textContent = "Trace chargée";
+  $("#drop-s").textContent = (fileName ? fileName + " · " : "") + "cliquer pour en changer";
+  $("#routeinfo").innerHTML = `<b>${esc(r.name || "Trace importée")}</b><br>${r.km.toFixed(1).replace(".",",")} km`
+    + (r.hasEle ? ` · ${Math.round(r.up)} m D+ · ${Math.round(r.down)} m D−` : " · pas d'altitude dans le fichier");
+  $("#go").disabled = false;
+  paceHint();
+}
+
+/* ---------- timing along route ---------- */
+function computeTimes(route, start, T){
+  const cup = Math.max(0, parseFloat($("#cup").value)||0), cdown = Math.max(0, parseFloat($("#cdown").value)||0);
+  const P = route.pts, eff = [0];
+  for (let i = 1; i < P.length; i++){
+    const dd = P[i].d - P[i-1].d, dz = P[i].es - P[i-1].es;
+    let e = dd + (dz > 0 ? cup*dz/100 : -cdown*(-dz)/100);
+    e = Math.max(e, dd*0.6);   // pas plus de ~1,7× la vitesse "à plat" en descente
+    eff.push(eff[i-1] + e);
+  }
+  const E = eff[eff.length-1];
+  return eff.map(e => start + T*e/E);
+}
+function bsearch(arr, v){ let lo = 0, hi = arr.length-1; while (hi-lo > 1){ const m = (lo+hi)>>1; if (arr[m] <= v) lo = m; else hi = m; } return lo; }
+function pointAtDist(route, d){
+  const P = route.pts; d = Math.max(0, Math.min(route.km, d));
+  const ds = route._ds || (route._ds = P.map(p => p.d));
+  const i = Math.min(bsearch(ds, d), P.length-2), a = P[i], b = P[i+1];
+  const f = (d - a.d) / ((b.d - a.d) || 1);
+  return {lat:a.lat+(b.lat-a.lat)*f, lon:a.lon+(b.lon-a.lon)*f, ele: route.hasEle ? a.ele+(b.ele-a.ele)*f : null, es:a.es+(b.es-a.es)*f, d};
+}
+function makeSamples(route, times, stepMin){
+  const t0 = times[0], t1 = times[times.length-1], T = t1 - t0;
+  let step = stepMin;
+  if (step === "auto"){
+    const opts = [10,15,20,30,45,60,90,120,180];
+    step = opts.find(s => T/(s*60000) <= 70) || 180;
+  }
+  const stepMs = step*60000, out = [];
+  for (let t = t0; t < t1 - stepMs*0.3; t += stepMs) out.push(t);
+  out.push(t1);
+  if (out.length > 90) throw new Error("Trop de points météo : choisis un intervalle plus grand dans les réglages avancés.");
+  return {step, list: out.map(t => {
+    const i = Math.min(bsearch(times, t), times.length-2);
+    const f = (t - times[i]) / ((times[i+1]-times[i]) || 1);
+    const d = route.pts[i].d + (route.pts[i+1].d - route.pts[i].d)*f;
+    const p = pointAtDist(route, d);
+    const a = pointAtDist(route, d-0.4), b = pointAtDist(route, d+0.4);
+    return {...p, t, brg: bearing(a, b)};
+  })};
+}
+
+/* ---------- Open-Meteo ---------- */
+const HV = ["temperature_2m","apparent_temperature","precipitation","precipitation_probability","weather_code","cloud_cover","wind_speed_10m","wind_direction_10m","wind_gusts_10m","is_day"];
+const isoDay = t => new Date(t).toISOString().slice(0,10);
+async function fetchWeather(samples, route, model){
+  const t0 = samples[0].t, t1 = samples[samples.length-1].t;
+  const q = new URLSearchParams({
+    latitude: samples.map(s => s.lat.toFixed(4)).join(","),
+    longitude: samples.map(s => s.lon.toFixed(4)).join(","),
+    hourly: HV.join(","), timeformat:"unixtime", timezone:"GMT",
+    start_date: isoDay(t0 - 3600000), end_date: isoDay(t1 + 3600000),
+    wind_speed_unit:"kmh"
+  });
+  if (route.hasEle) q.set("elevation", samples.map(s => Math.round(s.ele)).join(","));
+  if (model && model !== "best_match") q.set("models", model);
+  const res = await fetch("https://api.open-meteo.com/v1/forecast?" + q.toString());
+  let js; try { js = await res.json(); } catch(e){ js = null; }
+  if (!res.ok || !js || js.error) throw new Error("Le service météo a refusé la demande" + (js && js.reason ? " : " + js.reason : "") + ".");
+  return Array.isArray(js) ? js : [js];
+}
+function series(h, name){
+  if (h[name]) return h[name];
+  const k = Object.keys(h).find(k => k.startsWith(name + "_"));
+  return k ? h[k] : null;
+}
+function readAt(loc, t){
+  const h = loc.hourly, ts = h.time.map(x => x*1000);
+  const i = Math.max(0, Math.min(bsearch(ts, t), ts.length-2));
+  const f = Math.max(0, Math.min(1, (t - ts[i]) / (ts[i+1]-ts[i])));
+  const near = f < 0.5 ? i : i+1, after = f > 0 ? i+1 : i;   // précip = cumul de l'heure précédente
+  const lin = n => { const s = series(h,n); if (!s || s[i]==null || s[i+1]==null) return s ? (s[near] ?? null) : null; return s[i] + (s[i+1]-s[i])*f; };
+  const pick = (n, j) => { const s = series(h,n); return s ? (s[j] ?? null) : null; };
+  return {
+    temp: lin("temperature_2m"), feel: lin("apparent_temperature"),
+    rain: pick("precipitation", after), prob: pick("precipitation_probability", after),
+    code: pick("weather_code", near), cloud: lin("cloud_cover"),
+    wind: lin("wind_speed_10m"), gust: lin("wind_gusts_10m"), wdir: pick("wind_direction_10m", near),
+    day: pick("is_day", near)
+  };
+}
+const WMO = (c, day) => {
+  if (c==null) return ["—",""];
+  if (day === 0 && c <= 1) return [c===0 ? "Nuit claire" : "Nuit peu nuageuse", "🌙"];
+  if (c===0) return ["Clair","☀️"]; if (c===1) return ["Peu nuageux","🌤️"]; if (c===2) return ["Nuageux","⛅"]; if (c===3) return ["Couvert","☁️"];
+  if (c===45||c===48) return ["Brouillard","🌫️"]; if (c>=51&&c<=55) return ["Bruine","🌦️"]; if (c===56||c===57) return ["Bruine verglaçante","🧊"];
+  if (c===61) return ["Pluie faible","🌦️"]; if (c===63) return ["Pluie","🌧️"]; if (c===65) return ["Forte pluie","🌧️"]; if (c===66||c===67) return ["Pluie verglaçante","🧊"];
+  if (c>=71&&c<=77) return ["Neige","🌨️"]; if (c>=80&&c<=82) return [c===82?"Fortes averses":"Averses","🌦️"]; if (c===85||c===86) return ["Averses de neige","🌨️"];
+  if (c>=95) return [c>95?"Orage, grêle":"Orage","⛈️"]; return ["—",""];
+};
+function relWind(s){
+  if (s.w.wind==null || s.w.wdir==null) return null;
+  const diff = ((s.w.wdir - s.brg + 540) % 360) - 180;          // 0 = vent venant de devant
+  const head = s.w.wind * Math.cos(toRad(diff));
+  const ad = Math.abs(diff);
+  const lab = ad < 45 ? "face" : ad > 135 ? "dos" : (ad < 80 ? "3/4 face" : ad > 100 ? "3/4 dos" : "travers");
+  return {head, diff, lab};
+}
+function reliability(t){
+  const h = (t - Date.now())/3600000;
+  if (h < -1) return "passé";
+  if (h <= 48) return "fiable"; if (h <= 120) return "assez fiable"; if (h <= 240) return "indicatif"; return "tendance";
+}
+
+/* ---------- run ---------- */
+async function run(){
+  const route = state.route, start = startTime(), T = totalMs();
+  if (!route) return;
+  if (!start){ showMsg("Indique l'heure de départ.", "err"); return; }
+  if (!T){ showMsg("Indique une vitesse moyenne ou un temps prévu.", "err"); return; }
+  const end = start + T;
+  if (end > Date.now() + 16*86400000){ showMsg("Les prévisions vont jusqu'à 16 jours. Ton arrivée est prévue le " + fmtDay(end) + " : rapproche la date ou reviens plus tard.", "err"); return; }
+  if (start < Date.now() - 90*86400000){ showMsg("Ce départ est trop ancien pour les données de prévision (90 jours max).", "err"); return; }
+  saveSettings();
+  const btn = $("#go"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Chargement';
+  const out = $("#out");
+  if (state.last && $("#chart")) out.classList.add("busy");
+  else out.innerHTML = `<div class="card loading"><span class="spin"></span> Calcul de la météo sur ${n1(route.km)} km…</div>`;
+  try {
+    const times = computeTimes(route, start, T);
+    const {step, list} = makeSamples(route, times, $("#step").value === "auto" ? "auto" : parseInt($("#step").value,10));
+    const locs = await fetchWeather(list, route, $("#model").value);
+    list.forEach((s, i) => { s.w = readAt(locs[i] || locs[0], s.t); s.rel = relWind(s); });
+    state.last = {route, times, samples:list, step, start, end};
+    render(state.last);
+  } catch(e){
+    showMsg(e.message && !/fetch/i.test(e.message) ? e.message : "Impossible de joindre le service météo. Vérifie ta connexion internet puis réessaie.", "err");
+  } finally { out.classList.remove("busy"); btn.disabled = false; btn.textContent = state.last ? "Mettre à jour" : "Voir la météo"; }
+}
+function showMsg(text, kind){
+  $("#out").innerHTML = `<div class="msg" data-kind="${kind||"info"}">${esc(text)}</div>`;
+}
+
+/* ---------- render ---------- */
+const n0 = v => v==null ? "—" : Math.round(v);
+const n1 = v => v==null ? "—" : (Math.round(v*10)/10).toString().replace(".",",");
+function render(L){
+  const {route, samples:S, step, start, end} = L;
+  const temps = S.map(s=>s.w.temp).filter(v=>v!=null), feels = S.map(s=>s.w.feel).filter(v=>v!=null);
+  const tmin = Math.min(...temps), tmax = Math.max(...temps);
+  const minS = S.reduce((a,b)=> (b.w.temp??99) < (a.w.temp??99) ? b : a);
+  // pluie : exposition approx = somme mm/h × durée entre points
+  let mm = 0, wetMin = 0;
+  S.forEach((s,i) => { const dt = (i < S.length-1 ? S[i+1].t - s.t : 0)/3600000; if (s.w.rain) mm += s.w.rain*dt; if ((s.w.rain||0) >= 0.2) wetMin += dt*60; });
+  const probMax = S.reduce((a,b)=> (b.w.prob??-1) > (a.w.prob??-1) ? b : a);
+  let headMin = 0, totMin = 0;
+  S.forEach((s,i) => { const dt = (i < S.length-1 ? S[i+1].t - s.t : 0)/60000; totMin += dt; if (s.rel && s.rel.head >= 10) headMin += dt; });
+  const gustS = S.reduce((a,b)=> (b.w.gust??-1) > (a.w.gust??-1) ? b : a);
+  const night = S.filter(s => s.w.day === 0);
+  const rel = reliability(start);
+
+  const alerts = [];
+  const firstWet = S.find(s => (s.w.rain||0) >= 0.2 || (s.w.prob||0) >= 50);
+  if (firstWet) alerts.push(`<span class="chip rain">Pluie possible dès km ${n0(firstWet.d)} (${fmtH(firstWet.t)})</span>`);
+  const storm = S.find(s => (s.w.code||0) >= 95);
+  if (storm) alerts.push(`<span class="chip head">Orage prévu vers km ${n0(storm.d)} (${fmtH(storm.t)})</span>`);
+  if (tmin <= 2) alerts.push(`<span class="chip cold">Risque de gel : ${n1(tmin)} °C au km ${n0(minS.d)}${route.hasEle?" ("+n0(minS.ele)+" m)":""}</span>`);
+  if (totMin && headMin/totMin >= 0.3) alerts.push(`<span class="chip head">Vent de face ≥ 10 km/h sur ${Math.round(headMin/totMin*100)} % du temps</span>`);
+  if ((gustS.w.gust||0) >= 50) alerts.push(`<span class="chip head">Rafales ${n0(gustS.w.gust)} km/h au km ${n0(gustS.d)}</span>`);
+  if (night.length) alerts.push(`<span class="chip night">De nuit : km ${n0(night[0].d)}${night.length < S.length ? " à " + n0(night[night.length-1].d) : ""}</span>`);
+  if (!alerts.length) alerts.push(`<span class="chip">Rien de notable sur le parcours</span>`);
+
+  const modelName = $("#model").selectedOptions[0].textContent;
+  $("#out").innerHTML = `
+    <div class="routehead"><h2>${esc(route.name || "Trace importée")}</h2><span>${n1(route.km)} km${route.hasEle ? " · " + Math.round(route.up) + " m D+" : ""} · départ ${fmtDay(start)} ${fmtH(start)}</span></div>
+    <section class="stats" aria-label="Résumé">
+      <div class="stat"><div class="k">Départ · ${fmtDay(start)}</div><div class="v">${fmtH(start)}<small> → ${fmtH(end)}</small></div><div class="s">${fmtDur(end-start)} · ${n1(route.km/((end-start)/3600000))} km/h <span class="reli">${rel}</span></div></div>
+      <div class="stat"><div class="k">Température</div><div class="v">${n0(tmin)}°<small> / ${n0(tmax)}°</small></div><div class="s">ressentie mini ${n0(Math.min(...feels))}°</div></div>
+      <div class="stat"><div class="k">Pluie rencontrée</div><div class="v">${n1(mm)}<small> mm</small></div><div class="s">${wetMin>=5 ? "≈ " + fmtDur(wetMin*60000) + " sous la pluie" : "proba max " + n0(probMax.w.prob) + " %"}</div></div>
+      <div class="stat"><div class="k">Vent</div><div class="v">${n0(Math.max(...S.map(s=>s.w.wind||0)))}<small> km/h</small></div><div class="s">rafales ${n0(gustS.w.gust)} · de face ${totMin ? Math.round(headMin/totMin*100) : 0} % du temps</div></div>
+    </section>
+    <div class="alerts">${alerts.join("")}</div>
+    <section class="card">
+      <div class="sec-h"><h3>Le long du parcours</h3><span class="legend">Survole ou touche le graphique pour le détail à chaque endroit</span></div>
+      <div class="chartbox"><svg id="chart" role="img" aria-label="Profil, température, pluie et vent le long du parcours"></svg><div class="tip" id="tip" hidden></div></div>
+      <div class="legend" style="margin-top:14px">${route.hasEle ? SLOPES.map(x => `<span><i style="background:${x.col}"></i>${x.lab}</span>`).join("") + '<span style="width:8px"></span>' : ""}<span><i style="background:var(--warm);height:3px"></i>Température</span><span><i style="background:var(--warm);opacity:.5;height:3px"></i>Ressentie</span><span><i style="background:var(--rain)"></i>Pluie</span><span><i style="background:var(--head)"></i>Vent de face</span><span><i style="background:var(--tail)"></i>Vent de dos</span><span><i style="background:var(--night);border:1px solid var(--line)"></i>Nuit</span></div>
+    </section>
+    <section class="card">
+      <div class="sec-h"><h3>Carte</h3>
+        <div class="mapctl">
+          <label for="mapcolor">Couleur de la trace</label>
+          <select id="mapcolor"><option value="sky">Ciel et pluie</option><option value="temp">Température</option><option value="wind">Vent de face / dos</option></select>
+          <label class="ck"><input type="checkbox" id="showwind" checked> Flèches de vent</label>
+          <label class="ck"><input type="checkbox" id="showsky" checked> Pictos</label>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="legend maplegend" id="maplegend"></div>
+      <p class="foot" style="margin:6px 0 0">Les flèches montrent où souffle le vent ; leur taille suit sa force, leur couleur dit s'il est de face (rouge) ou de dos (vert) pour toi. Fond de carte au choix en haut à droite.</p>
+    </section>
+    <section class="card">
+      <div class="sec-h"><h3>Point par point</h3><span class="legend">un point toutes les ${step} min</span></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Km</th><th>Heure</th>${route.hasEle?"<th>Alt.</th>":""}<th>Ciel</th><th>Temp.</th><th>Ressentie</th><th>Pluie</th><th>Proba</th><th>Vent</th><th>Rafales</th><th>Relatif</th></tr></thead>
+        <tbody>${S.map(rowHTML).join("")}</tbody>
+      </table></div>
+    </section>
+    <p class="foot">Données <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · modèle : ${esc(modelName)} · températures corrigées à l'altitude de la trace${route.hasEle?"":" (altitude du terrain, la trace n'en contient pas)"}. Le vent est donné à 10 m du sol, souvent un peu plus fort que ce que tu ressens sur la route. Horaires calculés à partir de ta vitesse${(parseFloat($("#cup").value)||parseFloat($("#cdown").value))?", ajustés au dénivelé":""}.</p>`;
+  drawChart(L);
+  drawMap(L);
+}
+function arrowSVG(diff){
+  // flèche = sens où souffle le vent, toi tu avances vers le haut
+  return `<svg viewBox="-8 -8 16 16" aria-hidden="true"><g transform="rotate(${diff+180})"><path d="M0,-6 L4,2 L0,0 L-4,2 Z" fill="currentColor"/><line x1="0" y1="0" x2="0" y2="6" stroke="currentColor" stroke-width="1.6"/></g></svg>`;
+}
+function rowHTML(s){
+  const [lab, ico] = WMO(s.w.code, s.w.day);
+  const wet = (s.w.rain||0) >= 0.2 || (s.w.prob||0) >= 50;
+  const r = s.rel;
+  const cls = r ? (r.head >= 5 ? "face" : r.head <= -5 ? "dos" : "") : "";
+  return `<tr class="${wet?"wet":""} ${s.w.day===0?"isnight":""}">
+    <td>${n1(s.d)}</td><td>${fmtH(s.t)}</td>${state.last.route.hasEle?`<td>${n0(s.ele)} m</td>`:""}
+    <td title="${lab}">${ico} ${lab}</td><td>${n1(s.w.temp)}°</td><td>${n1(s.w.feel)}°</td>
+    <td>${s.w.rain==null?"—":n1(s.w.rain)+" mm"}</td><td>${s.w.prob==null?"—":n0(s.w.prob)+" %"}</td>
+    <td>${n0(s.w.wind)} km/h</td><td>${n0(s.w.gust)}</td>
+    <td>${r ? `<span class="wind-rel ${cls}">${arrowSVG(r.diff)} ${r.lab}</span>` : "—"}</td></tr>`;
+}
+
+const SLOPES = [
+  {max:-2,  col:"#9FB4C7", lab:"descente"},
+  {max:3,   col:"#CFC8B4", lab:"< 3 %"},
+  {max:6,   col:"#E5BE5C", lab:"3–6 %"},
+  {max:9,   col:"#DD8A3E", lab:"6–9 %"},
+  {max:12,  col:"#B8432F", lab:"9–12 %"},
+  {max:999, col:"#6E2433", lab:"> 12 %"}
+];
+const slopeCol = s => (s < -2 ? SLOPES[0] : SLOPES.slice(1).find(x => s < x.max)).col;
+function niceStep(range, n){
+  const raw = range / Math.max(1, n), p = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m*p >= raw) return m*p;
+  return 10*p;
+}
+function timeAtDist(L, d){
+  const ds = L.route._ds || (L.route._ds = L.route.pts.map(p => p.d));
+  const i = Math.min(bsearch(ds, d), ds.length-2), f = (d - ds[i]) / ((ds[i+1]-ds[i]) || 1);
+  return L.times[i] + (L.times[i+1]-L.times[i]) * Math.max(0, Math.min(1, f));
+}
+function distAtTime(L, t){
+  const i = Math.min(bsearch(L.times, t), L.times.length-2), f = (t - L.times[i]) / ((L.times[i+1]-L.times[i]) || 1);
+  return L.route.pts[i].d + (L.route.pts[i+1].d - L.route.pts[i].d) * f;
+}
+function drawChart(L){
+  const {route, samples:S, start, end} = L;
+  const svg = $("#chart"), box = svg.parentNode;
+  const W = Math.max(320, Math.round(box.clientWidth));
+  const narrow = W < 620;
+  const x0 = narrow ? 40 : 56, x1 = W - (narrow ? 34 : 44);
+  const X = d => x0 + (x1-x0) * d / route.km;
+  const panels = [{k:"sky", h:26}];
+  if (route.hasEle) panels.push({k:"ele", h: narrow ? 150 : 200, t:"Profil et pente"});
+  panels.push({k:"temp", h: narrow ? 110 : 140, t:"Température · ressentie"});
+  panels.push({k:"rain", h: narrow ? 80 : 100, t:"Pluie · probabilité"});
+  panels.push({k:"wind", h: narrow ? 104 : 124, t:"Vent dans ton axe"});
+  const top = 30; let y = top;
+  panels.forEach(p => { if (p.t) y += 26; p.y = y; y += p.h + (p.t ? 16 : 6); });
+  const bottom = y, H = y + 26;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  let g = "";
+  const hline = (yy, dash) => `<line x1="${x0}" x2="${x1}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="var(--line)" stroke-width="1"${dash ? ' stroke-dasharray="2 4"' : ""}/>`;
+  const lab = (xx, yy, txt, anchor, cls) => `<text x="${xx.toFixed(1)}" y="${yy.toFixed(1)}" font-size="11" text-anchor="${anchor||"end"}"${cls ? ` class="${cls}"` : ""}>${txt}</text>`;
+  const thin = (minPx) => { const out = []; let last = -1e9; S.forEach(s => { const px = X(s.d); if (px - last >= minPx){ out.push(s); last = px; } }); return out; };
+
+  // --- nuit
+  const first = panels[0].y, last = bottom;
+  for (let i = 0; i < S.length; i++){
+    if (S[i].w.day !== 0) continue;
+    const a = i ? (S[i-1].d + S[i].d)/2 : 0, b = i < S.length-1 ? (S[i].d + S[i+1].d)/2 : route.km;
+    g += `<rect x="${X(a).toFixed(1)}" y="${first}" width="${(X(b)-X(a)).toFixed(1)}" height="${last-first}" fill="var(--night)"/>`;
+  }
+  // --- heures (en haut) + bascules jour/nuit
+  const span = end - start, hrStep = span > 30*3600000 ? 4 : span > 14*3600000 ? 2 : 1;
+  const h0 = new Date(start); h0.setMinutes(0,0,0);
+  for (let t = h0.getTime() + 3600000; t < end; t += 3600000){
+    const hh = new Date(t).getHours();
+    if (hh % hrStep) continue;
+    const xx = X(distAtTime(L, t));
+    if (xx - x0 < 52 || x1 - xx < 52) continue;
+    g += `<line x1="${xx.toFixed(1)}" x2="${xx.toFixed(1)}" y1="${top-4}" y2="${bottom}" stroke="var(--line-soft)" stroke-width="1"/>`;
+    g += lab(xx, top-10, hh === 0 ? `<tspan font-weight="600" fill="var(--ink)">${fmtDay(t)}</tspan>` : hh + "h", "middle");
+  }
+  g += lab(x0, top-10, fmtH(start), "start", "ann") + lab(x1, top-10, fmtH(end), "end", "ann");
+
+  panels.forEach(p => {
+    if (p.t) g += `<text x="${x0}" y="${p.y-10}" class="pt">${p.t}</text>`;
+
+    if (p.k === "sky"){
+      thin(narrow ? 30 : 36).forEach(s => {
+        const [, ico] = WMO(s.w.code, s.w.day);
+        g += `<text x="${X(s.d).toFixed(1)}" y="${p.y+18}" font-size="16" text-anchor="middle">${ico}</text>`;
+      });
+    }
+
+    if (p.k === "ele"){
+      const nb = Math.min(260, Math.max(30, Math.round((x1-x0)/4)));
+      const bin = route.km / nb, E = [];
+      for (let i = 0; i <= nb; i++) E.push(pointAtDist(route, i*bin).es);
+      const emin = Math.min(...E), emax = Math.max(...E), rng = Math.max(50, emax - emin);
+      const lo = emin - rng*0.04, hi = emax + rng*0.22;
+      const Y = v => p.y + p.h - p.h * (v - lo) / (hi - lo);
+      const st = niceStep(hi - lo, narrow ? 3 : 4);
+      for (let v = Math.ceil(lo/st)*st; v <= hi; v += st){ g += hline(Y(v), true) + lab(x0-8, Y(v)+4, Math.round(v)); }
+      g += lab(x0-8, p.y-10, "m");
+      L._slope = [];
+      for (let i = 0; i < nb; i++){
+        const s = (E[i+1]-E[i]) / (bin*1000) * 100; L._slope.push(s);
+        g += `<path d="M${X(i*bin).toFixed(1)},${p.y+p.h} L${X(i*bin).toFixed(1)},${Y(E[i]).toFixed(1)} L${(X((i+1)*bin)+.6).toFixed(1)},${Y(E[i+1]).toFixed(1)} L${(X((i+1)*bin)+.6).toFixed(1)},${p.y+p.h}Z" fill="${slopeCol(s)}"/>`;
+      }
+      L._bin = bin;
+      g += `<path d="${E.map((e,i) => `${i?"L":"M"}${X(i*bin).toFixed(1)},${Y(e).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/>`;
+      g += `<line x1="${x0}" x2="${x1}" y1="${p.y+p.h}" y2="${p.y+p.h}" stroke="var(--ink)" stroke-opacity=".5"/>`;
+      // sommets : maxima locaux avec au moins 120 m de dénivelé de part et d'autre
+      const w = Math.max(2, Math.round(nb*0.025)), peaks = [];
+      for (let i = 1; i < nb; i++){
+        let isMax = true;
+        for (let k = Math.max(0, i-w); k <= Math.min(nb, i+w); k++) if (E[k] > E[i]) { isMax = false; break; }
+        if (!isMax) continue;
+        let l = E[i], r = E[i];
+        for (let k = i; k >= 0 && E[k] <= E[i]; k--) l = Math.min(l, E[k]);
+        for (let k = i; k <= nb && E[k] <= E[i]; k++) r = Math.min(r, E[k]);
+        const prom = E[i] - Math.max(l, r);
+        if (prom >= 120 && !peaks.some(q => Math.abs(q.i - i) <= w)) peaks.push({i, e:E[i], prom});
+      }
+      const shown = [];
+      peaks.sort((a,b) => b.prom - a.prom).forEach(pk => {
+        const xx = X(pk.i*bin);
+        if (shown.some(q => Math.abs(q - xx) < 92) || shown.length >= 6) return;
+        shown.push(xx);
+        const t = timeAtDist(L, pk.i*bin), yy = Y(pk.e);
+        const anchor = xx < x0 + 50 ? "start" : xx > x1 - 50 ? "end" : "middle";
+        g += `<circle cx="${xx.toFixed(1)}" cy="${yy.toFixed(1)}" r="3.2" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.4"/>`;
+        g += `<text x="${xx.toFixed(1)}" y="${(yy-22).toFixed(1)}" text-anchor="${anchor}" class="pk">${Math.round(pk.e)} m</text>`;
+        g += `<text x="${xx.toFixed(1)}" y="${(yy-9).toFixed(1)}" text-anchor="${anchor}" font-size="10.5">km ${n1(pk.i*bin)} · ${fmtH(t)}</text>`;
+      });
+      p.Y = Y;
+    }
+
+    if (p.k === "temp"){
+      const vals = S.flatMap(s => [s.w.temp, s.w.feel]).filter(v => v != null);
+      const st = niceStep(Math.max(4, Math.max(...vals) - Math.min(...vals)), narrow ? 3 : 4);
+      const lo = Math.floor((Math.min(...vals) - 0.5)/st)*st, hi = Math.ceil((Math.max(...vals) + 0.5)/st)*st;
+      const Y = v => p.y + p.h - p.h * (v - lo) / ((hi - lo) || 1);
+      for (let v = lo; v <= hi + 1e-9; v += st) g += hline(Y(v), v !== 0) + lab(x0-8, Y(v)+4, (Math.round(v*10)/10) + "°");
+      if (lo < 0 && hi > 0) g += `<line x1="${x0}" x2="${x1}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--cold)" stroke-width="1.2"/>` + lab(x1+6, Y(0)+4, "0° gel", "start");
+      const T = S.filter(s => s.w.temp != null && s.w.feel != null);
+      if (T.length > 1){
+        g += `<path d="${T.map((s,i)=>`${i?"L":"M"}${X(s.d).toFixed(1)},${Y(s.w.temp).toFixed(1)}`).join(" ")} ${T.slice().reverse().map(s=>`L${X(s.d).toFixed(1)},${Y(s.w.feel).toFixed(1)}`).join(" ")}Z" fill="var(--warm)" fill-opacity=".1"/>`;
+        g += `<path d="${T.map((s,i)=>`${i?"L":"M"}${X(s.d).toFixed(1)},${Y(s.w.feel).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--warm)" stroke-opacity=".6" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+        g += `<path d="${T.map((s,i)=>`${i?"L":"M"}${X(s.d).toFixed(1)},${Y(s.w.temp).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--warm)" stroke-width="2.4" stroke-linejoin="round"/>`;
+        const mn = T.reduce((a,b) => b.w.temp < a.w.temp ? b : a), mx = T.reduce((a,b) => b.w.temp > a.w.temp ? b : a);
+        const close = Math.abs(X(mx.d) - X(mn.d)) < 70;
+        [[mx, -9, "max"], [mn, close ? 17 : -9, "min"]].forEach(([s, dy, k]) => {
+          if (k === "min" && mn === mx) return;
+          const xx = X(s.d), anchor = xx < x0 + 40 ? "start" : xx > x1 - 40 ? "end" : "middle";
+          g += `<circle cx="${xx.toFixed(1)}" cy="${Y(s.w.temp).toFixed(1)}" r="3.5" fill="var(--warm)" stroke="var(--panel)" stroke-width="1.5"/>`;
+          g += `<text x="${xx.toFixed(1)}" y="${(Y(s.w.temp)+dy).toFixed(1)}" text-anchor="${anchor}" class="ann">${k} ${n1(s.w.temp)}°</text>`;
+        });
+      }
+      p.Y = Y;
+    }
+
+    if (p.k === "rain"){
+      const mxr = Math.max(...S.map(s => s.w.rain || 0));
+      const hi = mxr < 1 ? 1 : mxr < 2 ? 2 : mxr < 5 ? 5 : Math.ceil(mxr/5)*5;
+      const Y = v => p.y + p.h - p.h * v / hi;
+      [0, hi/2, hi].forEach(v => { g += hline(Y(v), v !== 0) + lab(x0-8, Y(v)+4, n1(v)); });
+      g += lab(x0-8, p.y-10, "mm/h");
+      [0, 50, 100].forEach(v => { g += lab(x1+6, p.y + p.h - p.h*v/100 + 4, v + "%", "start"); });
+      const pr = S.filter(s => s.w.prob != null);
+      if (pr.length > 1){
+        const PY = v => p.y + p.h - p.h * v / 100;
+        g += `<path d="M${X(pr[0].d).toFixed(1)},${p.y+p.h} ${pr.map(s=>`L${X(s.d).toFixed(1)},${PY(s.w.prob).toFixed(1)}`).join(" ")} L${X(pr[pr.length-1].d).toFixed(1)},${p.y+p.h}Z" fill="var(--rain)" fill-opacity=".12"/>`;
+        g += `<path d="${pr.map((s,i)=>`${i?"L":"M"}${X(s.d).toFixed(1)},${PY(s.w.prob).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--rain)" stroke-opacity=".55" stroke-width="1.3"/>`;
+      }
+      const wbar = Math.min(10, Math.max(3, (x1-x0)/S.length*0.55));
+      S.forEach(s => { const v = s.w.rain || 0; if (v <= 0) return; const a = Math.max(x0, X(s.d)-wbar/2), b = Math.min(x1, X(s.d)+wbar/2);
+        g += `<rect x="${a.toFixed(1)}" y="${Y(Math.min(v,hi)).toFixed(1)}" width="${(b-a).toFixed(1)}" height="${(p.y+p.h-Y(Math.min(v,hi))).toFixed(1)}" fill="var(--rain)" rx="1.5"/>`; });
+      if (mxr <= 0 && !pr.some(s => s.w.prob >= 20)) g += `<text x="${(x0+x1)/2}" y="${p.y+p.h/2+4}" text-anchor="middle" font-size="12">Pas de pluie prévue sur le parcours</text>`;
+    }
+
+    if (p.k === "wind"){
+      const band = 22, top2 = p.y + band, h2 = p.h - band, mid = top2 + h2/2;
+      const mx = Math.max(10, ...S.map(s => Math.abs(s.rel?.head || 0)));
+      const lim = Math.ceil(mx/5)*5;
+      const Y = v => mid - (h2/2) * v / lim;
+      g += hline(Y(lim), true) + hline(Y(-lim), true) + `<line x1="${x0}" x2="${x1}" y1="${mid}" y2="${mid}" stroke="var(--ink)" stroke-opacity=".35"/>`;
+      g += lab(x0-8, Y(lim)+4, "+" + lim) + lab(x0-8, mid+4, "0") + lab(x0-8, Y(-lim)+4, "−" + lim);
+      g += lab(x1+6, Y(lim*0.6)+4, "face", "start") + lab(x1+6, Y(-lim*0.6)+4, "dos", "start");
+      const wbar = Math.min(10, Math.max(3, (x1-x0)/S.length*0.55));
+      S.forEach(s => { if (!s.rel) return; const v = s.rel.head, a = Math.max(x0, X(s.d)-wbar/2), b = Math.min(x1, X(s.d)+wbar/2);
+        g += `<rect x="${a.toFixed(1)}" y="${Math.min(mid, Y(v)).toFixed(1)}" width="${(b-a).toFixed(1)}" height="${Math.max(.8, Math.abs(Y(v)-mid)).toFixed(1)}" fill="${v > 0 ? "var(--head)" : "var(--tail)"}" rx="1.5"/>`; });
+      // rafales : petit trait au-dessus de chaque point
+      thin(narrow ? 24 : 28).forEach(s => {
+        if (!s.rel) return;
+        const col = s.rel.head >= 5 ? "var(--head)" : s.rel.head <= -5 ? "var(--tail)" : "var(--muted)";
+        const sz = 9 + Math.min(s.w.wind || 0, 50) / 50 * 6;
+        g += `<g transform="translate(${X(s.d).toFixed(1)},${p.y + band/2 - 2}) rotate(${(s.rel.diff + 180).toFixed(0)})"><path d="M0,${-sz/2} L${sz*0.32},${sz*0.18} L0,${sz*0.04} L${-sz*0.32},${sz*0.18}Z M-0.9,0 h1.8 v${sz/2} h-1.8Z" fill="${col}"/></g>`;
+      });
+      p.Y = Y; p.mid = mid;
+    }
+  });
+
+  // --- km en bas
+  const kmStep = niceStep(route.km, narrow ? 4 : 8);
+  for (let k = kmStep; k < route.km - kmStep*0.3; k += kmStep) g += lab(X(k), H-8, Math.round(k), "middle");
+  g += lab(x0, H-8, "0", "middle") + lab(x1, H-8, n1(route.km) + " km", "end", "ann");
+
+  // --- curseur
+  g += `<g id="cur" visibility="hidden"><line id="cur-l" x1="0" x2="0" y1="${top-4}" y2="${bottom}" stroke="var(--ink)" stroke-width="1"/>`
+     + panels.filter(p => p.k === "ele" || p.k === "temp").map(p => `<circle id="cur-${p.k}" r="4" fill="var(--panel)" stroke="${p.k==="ele"?"var(--ink)":"var(--warm)"}" stroke-width="2"/>`).join("") + `</g>`;
+  g += `<rect id="hit" x="${x0}" y="0" width="${x1-x0}" height="${H}" fill="transparent"/>`;
+  svg.innerHTML = g;
+
+  const tip = $("#tip"), cur = svg.querySelector("#cur");
+  const pe = panels.find(p => p.k === "ele"), pt = panels.find(p => p.k === "temp");
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+    const d = Math.max(0, Math.min(route.km, (px - x0) / (x1 - x0) * route.km));
+    const s = S.reduce((a,b) => Math.abs(b.d-d) < Math.abs(a.d-d) ? b : a);
+    const xx = X(d), pos = pointAtDist(route, d), t = timeAtDist(L, d);
+    cur.setAttribute("visibility", "visible");
+    svg.querySelector("#cur-l").setAttribute("x1", xx); svg.querySelector("#cur-l").setAttribute("x2", xx);
+    if (pe){ const c = svg.querySelector("#cur-ele"); c.setAttribute("cx", xx); c.setAttribute("cy", pe.Y(pos.es)); }
+    if (pt && s.w.temp != null){ const c = svg.querySelector("#cur-temp"); c.setAttribute("cx", X(s.d)); c.setAttribute("cy", pt.Y(s.w.temp)); }
+    const slope = L._slope ? L._slope[Math.min(L._slope.length-1, Math.floor(d / L._bin))] : null;
+    const [lb, ico] = WMO(s.w.code, s.w.day);
+    tip.innerHTML = `<b>${fmtH(t)}</b> <span class="m">· km ${n1(d)}${route.hasEle ? " · " + n0(pos.es) + " m" + (slope != null ? " · " + (slope >= 0 ? "+" : "") + n1(slope) + " %" : "") : ""}</span><br>`
+      + `${ico} ${lb} · <b style="font-size:.95rem">${n1(s.w.temp)}°</b> <span class="m">ressenti ${n1(s.w.feel)}°</span><br>`
+      + `Pluie ${n1(s.w.rain)} mm/h <span class="m">· ${n0(s.w.prob)} %</span><br>`
+      + `Vent ${n0(s.w.wind)} km/h${s.rel ? " de " + s.rel.lab : ""} <span class="m">· rafales ${n0(s.w.gust)}</span>`;
+    tip.hidden = false;
+    const bw = tip.offsetWidth, sx = xx / W * r.width;
+    tip.style.left = Math.max(0, Math.min(r.width - bw, sx + (sx > r.width/2 ? -bw - 14 : 14))) + "px";
+    tip.style.top = ((pe ? pe.y : panels[1].y) / H * r.height) + "px";
+  };
+  const hit = svg.querySelector("#hit");
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerdown", move);
+  svg.addEventListener("pointerleave", () => { tip.hidden = true; cur.setAttribute("visibility", "hidden"); });
+}
+let _rz = null;
+window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(() => { if (state.last && $("#chart")) drawChart(state.last); }, 150); });
+
+/* ---------- carte ---------- */
+const OSM_ATTR = '© <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>';
+const BASES = {
+  osm:     {name:"OpenStreetMap", hosted:true, url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png", o:{maxZoom:19, referrerPolicy:"strict-origin-when-cross-origin", attribution:OSM_ATTR}},
+  osmfr:   {name:"OpenStreetMap France", hosted:true, url:"https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png", o:{subdomains:"abc", maxZoom:20, referrerPolicy:"strict-origin-when-cross-origin", attribution:OSM_ATTR+' · <a href="https://www.openstreetmap.fr">OSM France</a>'}},
+  ofm:     {name:"OpenStreetMap (OpenFreeMap)", vector:"https://tiles.openfreemap.org/styles/liberty", attribution:'<a href="https://openfreemap.org">OpenFreeMap</a> · '+OSM_ATTR},
+  cyclosm: {name:"CyclOSM (vélo)", url:"https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", o:{subdomains:"abc", maxZoom:20, attribution:OSM_ATTR+' · <a href="https://www.cyclosm.org">CyclOSM</a>'}},
+  topo:    {name:"OpenTopoMap (relief)", url:"https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", o:{subdomains:"abc", maxZoom:17, attribution:OSM_ATTR+' · <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'}}
+
+};
+function lerpColor(stops, v){
+  if (v == null) return "#9aa5b1";
+  if (v <= stops[0][0]) return stops[0][1];
+  for (let i = 1; i < stops.length; i++){
+    if (v <= stops[i][0]){
+      const [a, ca] = stops[i-1], [b, cb] = stops[i], f = (v-a)/(b-a);
+      const h = c => [1,3,5].map(k => parseInt(c.slice(k,k+2),16));
+      const A = h(ca), B = h(cb);
+      return "#" + A.map((x,k) => Math.round(x+(B[k]-x)*f).toString(16).padStart(2,"0")).join("");
+    }
+  }
+  return stops[stops.length-1][1];
+}
+const TEMP_STOPS = [[-10,"#5b3fc4"],[0,"#3a6fd8"],[6,"#5fb3d9"],[12,"#9ccf6a"],[18,"#f2c84b"],[24,"#f08a3c"],[32,"#c8402c"]];
+const WIND_STOPS = [[-25,"#1d7a45"],[-8,"#5fbf86"],[0,"#a7b0ba"],[8,"#f0976e"],[25,"#c8402c"]];
+const SKY = [
+  {k:"clair",   lab:"Sec, dégagé",   col:"#f2b632"},
+  {k:"nuage",   lab:"Sec, nuageux",  col:"#9aa5b1"},
+  {k:"brouil",  lab:"Brouillard",    col:"#c4b8a8"},
+  {k:"risque",  lab:"Risque de pluie (≥ 40 %)", col:"#9cc7ef"},
+  {k:"faible",  lab:"Pluie faible",  col:"#4f9be0"},
+  {k:"pluie",   lab:"Pluie ≥ 1 mm/h", col:"#1f5fb8"},
+  {k:"neige",   lab:"Neige",         col:"#b48ad8"},
+  {k:"orage",   lab:"Orage",         col:"#7a1f6e"}
+];
+function skyCat(w){
+  const c = w.code ?? -1, r = w.rain || 0, p = w.prob || 0;
+  if (c >= 95) return "orage";
+  if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "neige";
+  if (r >= 1) return "pluie";
+  if (r >= 0.1 || (c >= 51 && c <= 67) || (c >= 80 && c <= 82)) return "faible";
+  if (p >= 40) return "risque";
+  if (c === 45 || c === 48) return "brouil";
+  if (c >= 0 && c <= 1) return "clair";
+  return "nuage";
+}
+function segColor(s, mode){
+  if (mode === "temp") return lerpColor(TEMP_STOPS, s.w.temp);
+  if (mode === "wind") return lerpColor(WIND_STOPS, s.rel ? s.rel.head : null);
+  return SKY.find(x => x.k === skyCat(s.w)).col;
+}
+function legendHTML(mode){
+  if (mode === "temp") return `<span>-10°</span><span class="ramp" style="background:linear-gradient(90deg,${TEMP_STOPS.map(s=>s[1]).join(",")})"></span><span>32°</span>`;
+  if (mode === "wind") return `<span>vent de dos</span><span class="ramp" style="background:linear-gradient(90deg,${WIND_STOPS.map(s=>s[1]).join(",")})"></span><span>vent de face</span>`;
+  return SKY.map(x => `<span><i style="background:${x.col}"></i>${x.lab}</span>`).join("");
+}
+function windIcon(s){
+  const sp = s.w.wind || 0, size = Math.round(22 + Math.min(sp, 50)/50*16);
+  const col = s.rel ? lerpColor(WIND_STOPS, s.rel.head) : "#5b6876";
+  const rot = ((s.w.wdir ?? 0) + 180) % 360;   // la flèche montre où va le vent
+  return window.L.divIcon({className:"wind-ico", iconSize:[size,size], iconAnchor:[size/2,size/2],
+    html:`<svg viewBox="-12 -12 24 24" width="${size}" height="${size}" style="transform:rotate(${rot}deg)"><path d="M0,-10 L7,4 L1.6,1.5 L1.6,10 L-1.6,10 L-1.6,1.5 L-7,4 Z" fill="${col}" stroke="#18212b" stroke-width="1.4" stroke-linejoin="round"/></svg>`});
+}
+function skyIcon(s){
+  const [, ico] = WMO(s.w.code, s.w.day);
+  return window.L.divIcon({className:"sky-ico", iconSize:[34,46], iconAnchor:[17,54],
+    html:`<span>${ico || "·"}</span><b>${n0(s.w.temp)}°</b>`});
+}
+function popup(s){
+  const [lab, ico] = WMO(s.w.code, s.w.day);
+  return `<b>km ${n1(s.d)} · ${fmtH(s.t)}</b>${s.ele!=null?" · "+n0(s.ele)+" m":""}<br>${ico} ${lab} · ${n1(s.w.temp)}° (ressenti ${n1(s.w.feel)}°)<br>Pluie ${n1(s.w.rain)} mm · ${n0(s.w.prob)} %<br>Vent ${n0(s.w.wind)} km/h${s.rel?" de "+s.rel.lab:""} · rafales ${n0(s.w.gust)}`;
+}
+const mapPref = {
+  get(){ try { return JSON.parse(localStorage.getItem("meteo-parcours-map") || "{}"); } catch(e){ return {}; } },
+  set(v){ try { localStorage.setItem("meteo-parcours-map", JSON.stringify({...mapPref.get(), ...v})); } catch(e){} }
+};
+let map = null, layers = null;
+function drawMap(L){
+  const el = $("#map");
+  if (typeof window.L === "undefined"){ el.outerHTML = '<p class="foot">La carte n\'a pas pu se charger (connexion ?). Le reste fonctionne.</p>'; return; }
+  if (map){ map.remove(); map = null; }
+  const pref = mapPref.get();
+  map = window.L.map(el, {scrollWheelZoom:false});
+  const baseLayers = {}, keyOf = {};
+  const hosted = /^https?:/.test(location.protocol);
+  for (const [k, b] of Object.entries(BASES)){
+    let layer = null;
+    if (b.vector){ if (window.L.maplibreGL && window.maplibregl) layer = window.L.maplibreGL({style:b.vector, attribution:b.attribution}); }
+    else if (b.hosted){ if (hosted) layer = window.L.tileLayer(b.url, b.o); }
+    else layer = window.L.tileLayer(b.url, b.o);
+    if (layer){ baseLayers[b.name] = layer; keyOf[b.name] = k; }
+  }
+  const ok = k => BASES[k] && baseLayers[BASES[k].name];
+  const def = ok(pref.base) ? pref.base : ok("osm") ? "osm" : ok("ofm") ? "ofm" : (state.act === "trail" ? "topo" : "cyclosm");
+  baseLayers[BASES[def].name].addTo(map);
+  // un fond raster qui ne répond pas : on bascule sur un autre
+  const fallback = ok("osm") ? "osm" : ok("ofm") ? "ofm" : "topo";
+  // fond vectoriel : si le style ne charge pas, on passe sur OpenTopoMap
+  const vec = ok("ofm") && baseLayers[BASES.ofm.name];
+  const watchVec = () => {
+    const m = vec.getMaplibreMap && vec.getMaplibreMap();
+    if (!m || m._mpWatched) return; m._mpWatched = true;
+    let n = 0;
+    m.on("error", () => {
+      if ((!m.isStyleLoaded() || ++n >= 8) && map && map.hasLayer(vec)){
+        map.removeLayer(vec); baseLayers[BASES.topo.name].addTo(map);
+      }
+    });
+  };
+  if (vec){ vec.on("add", watchVec); if (map.hasLayer(vec)) watchVec(); }
+  for (const [nm, layer] of Object.entries(baseLayers)){
+    if (!layer.on || keyOf[nm] === fallback) continue;
+    let errs = 0;
+    layer.on("tileerror", () => {
+      if (++errs === 6 && map.hasLayer(layer)){ map.removeLayer(layer); baseLayers[BASES[fallback].name].addTo(map); }
+    });
+  }
+  window.L.control.layers(baseLayers, null, {position:"topright"}).addTo(map);
+  map.on("baselayerchange", e => mapPref.set({base: keyOf[e.name]}));
+  window.L.control.scale({imperial:false}).addTo(map);
+
+  const all = L.route.pts.map(p => [p.lat, p.lon]);
+  map.fitBounds(window.L.latLngBounds(all), {padding:[22,22]});
+  layers = {trace: window.L.layerGroup().addTo(map), wind: window.L.layerGroup(), sky: window.L.layerGroup()};
+
+  const mode = $("#mapcolor").value = pref.color || "sky";
+  $("#showwind").checked = pref.wind !== false;
+  $("#showsky").checked = pref.sky !== false;
+  drawTrace(L, mode);
+
+  L.samples.forEach(s => { if (s.w.wdir != null) window.L.marker([s.lat, s.lon], {icon: windIcon(s), keyboard:false}).bindPopup(popup(s)).addTo(layers.wind); });
+  // pictos : départ, arrivée, chaque changement de temps, et au moins tous les ~1/6 du parcours
+  let lastCat = null, lastD = -1e9;
+  L.samples.forEach((s, i) => {
+    const cat = skyCat(s.w), isEnd = i === 0 || i === L.samples.length-1;
+    if (isEnd || cat !== lastCat || s.d - lastD >= L.route.km/6){
+      window.L.marker([s.lat, s.lon], {icon: skyIcon(s), keyboard:false, zIndexOffset:500}).bindPopup(popup(s)).addTo(layers.sky);
+      lastCat = cat; lastD = s.d;
+    }
+  });
+  if ($("#showwind").checked) layers.wind.addTo(map);
+  if ($("#showsky").checked) layers.sky.addTo(map);
+}
+function drawTrace(L, mode){
+  layers.trace.clearLayers();
+  const P = L.route.pts, S = L.samples;
+  const all = P.map(p => [p.lat, p.lon]);
+  window.L.polyline(all, {color:"#ffffff", weight:9, opacity:.9, interactive:false}).addTo(layers.trace);
+  // un tronçon par point météo, du milieu précédent au milieu suivant
+  let j = 0;
+  for (let i = 0; i < S.length; i++){
+    const a = i ? (S[i-1].d + S[i].d)/2 : 0, b = i < S.length-1 ? (S[i].d + S[i+1].d)/2 : L.route.km;
+    const seg = [pointAtDist(L.route, a)];
+    while (j < P.length && P[j].d < a) j++;
+    let k = j;
+    while (k < P.length && P[k].d <= b){ seg.push(P[k]); k++; }
+    seg.push(pointAtDist(L.route, b));
+    window.L.polyline(seg.map(p => [p.lat, p.lon]), {color: segColor(S[i], mode), weight:5.5, opacity:1, lineCap:"butt"})
+      .bindPopup(popup(S[i])).addTo(layers.trace);
+  }
+  const st = P[0], en = P[P.length-1];
+  window.L.circleMarker([st.lat, st.lon], {radius:6, color:"#18212b", weight:2, fillColor:"#ffffff", fillOpacity:1}).bindTooltip("Départ " + fmtH(S[0].t)).addTo(layers.trace);
+  window.L.circleMarker([en.lat, en.lon], {radius:6, color:"#ffffff", weight:2, fillColor:"#18212b", fillOpacity:1}).bindTooltip("Arrivée " + fmtH(S[S.length-1].t)).addTo(layers.trace);
+  $("#maplegend").innerHTML = legendHTML(mode);
+}
+
+/* ---------- wiring ---------- */
+async function loadFile(f){
+  try {
+    const text = await f.text();
+    const {pts, name} = parseGPX(text);
+    setRoute(buildRoute(pts, name || f.name.replace(/\.gpx$/i, "")), f.name);
+    $("#gpx").value = "";
+    run();
+  } catch(e){
+    state.route = null; $("#go").disabled = true;
+    const drop = $("#drop"); drop.classList.remove("loaded"); drop.classList.add("bad");
+    $("#drop-t").textContent = "Fichier non lu"; $("#drop-s").textContent = e.message;
+    $("#routeinfo").textContent = "Essaie un autre export GPX.";
+  }
+}
+$("#gpx").addEventListener("change", e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+$("#demo").addEventListener("click", () => { setRoute(demoRoute()); run(); });
+$("#act-velo").addEventListener("click", () => { saveSettings(); setAct("velo", true); });
+$("#act-trail").addEventListener("click", () => { saveSettings(); setAct("trail", true); });
+$("#mode-speed").addEventListener("click", () => setMode("speed"));
+$("#mode-time").addEventListener("click", () => setMode("time"));
+["speed","dh","dm","start","cup","cdown"].forEach(id => $("#"+id).addEventListener("input", paceHint));
+$("#go").addEventListener("click", run);
+let _auto = null;
+const autoRun = () => { if (!state.route || !state.last) return; clearTimeout(_auto); _auto = setTimeout(run, 700); };
+["speed","dh","dm","start","cup","cdown"].forEach(id => $("#"+id).addEventListener("change", autoRun));
+["model","step"].forEach(id => $("#"+id).addEventListener("change", autoRun));
+["act-velo","act-trail","mode-speed","mode-time"].forEach(id => $("#"+id).addEventListener("click", autoRun));
+$("#out").addEventListener("change", e => {
+  if (!map || !layers || !state.last) return;
+  if (e.target.id === "mapcolor"){ mapPref.set({color:e.target.value}); drawTrace(state.last, e.target.value); }
+  if (e.target.id === "showwind"){ mapPref.set({wind:e.target.checked}); e.target.checked ? layers.wind.addTo(map) : map.removeLayer(layers.wind); }
+  if (e.target.id === "showsky"){ mapPref.set({sky:e.target.checked}); e.target.checked ? layers.sky.addTo(map) : map.removeLayer(layers.sky); }
+});
+
+// état initial
+const saved = store.get();
+const d = new Date(); d.setDate(d.getDate()+1); d.setHours(8,0,0,0);
+const pad = n => String(n).padStart(2,"0");
+$("#start").value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T08:00`;
+if (saved.speed) $("#speed").value = saved.speed;
+if (saved.dh) $("#dh").value = saved.dh;
+if (saved.dm) $("#dm").value = saved.dm;
+if (saved.model) $("#model").value = saved.model;
+if (saved.step) $("#step").value = saved.step;
+setAct(saved.act || "velo", !saved.act);
+if (saved.cup) $("#cup").value = saved.cup;
+if (saved.cdown) $("#cdown").value = saved.cdown;
+setMode(saved.mode || "speed");
+})();
+</script>
+</body>
+</html>
