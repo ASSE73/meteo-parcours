@@ -59,7 +59,7 @@ aside.card{position:sticky;top:20px;display:flex;flex-direction:column;gap:22px;
 @media (max-width:960px){aside.card{position:static}}
 .label{font:600 .66rem/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.16em;color:var(--ink);margin-bottom:10px;display:block}
 input,select,button{font:inherit;color:inherit}
-input[type=number],input[type=datetime-local],input[type=text],select{width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;font-variant-numeric:tabular-nums;font-size:1rem}
+input[type=number],input[type=datetime-local],input[type=date],input[type=text],select{width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;font-variant-numeric:tabular-nums;font-size:1rem}
 select{padding-right:4px;cursor:pointer}
 input:focus-visible,select:focus-visible,button:focus-visible,.drop:focus-within{outline:2px solid var(--ink);outline-offset:3px}
 
@@ -97,6 +97,28 @@ details .inner{display:flex;flex-direction:column;gap:16px;margin-top:14px}
 .go{background:var(--ink);color:#fff;border:0;border-radius:0;padding:16px;font:600 .95rem/1 var(--f-num);letter-spacing:-.01em;cursor:pointer;transition:background .15s}
 .go:hover{background:#2A2A2A}
 .go:disabled{opacity:.3;cursor:default;background:var(--ink)}
+.range{display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:center;margin-bottom:6px}
+.range input[type=time]{width:100%;padding:8px 0;border:0;border-bottom:1px solid var(--line);background:transparent;font:500 1.05rem/1.1 var(--f-num);font-variant-numeric:tabular-nums}
+.range span{color:var(--muted)}
+.range .rm{border:0;background:none;font-size:1.2rem;line-height:1;cursor:pointer;color:var(--muted);padding:4px 6px}
+.range .rm:hover{color:var(--ink)}
+.slots{display:flex;flex-direction:column}
+.slot-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:22px}
+@media (max-width:760px){.slot-row{grid-template-columns:minmax(0,1fr)}.slot+.slot{border-left:0!important;border-top:1px solid var(--hair)}}
+.slot{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;background:transparent;border:0;padding:16px 16px 18px;cursor:pointer;min-width:0;color:var(--ink)}
+.slot+.slot{border-left:1px solid var(--hair)}
+.slot:hover{background:#F7F7F7}
+.slot.sel{background:#0B0B0B;color:#fff}
+.slot.sel .slot-r,.slot.sel .slot-t small,.slot.sel .slot-score small,.slot.sel .slot-k{color:#B5B5B5}
+.slot-k{font:600 .64rem/1 var(--f-body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.slot-t{font:600 clamp(1.8rem,3.4vw,2.6rem)/1 var(--f-num);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.slot-t small{font-size:.5em;font-weight:500;letter-spacing:0;color:var(--muted)}
+.slot-score{display:flex;align-items:center;gap:8px;font:600 1.15rem/1 var(--f-num);font-variant-numeric:tabular-nums}
+.slot-score i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.slot-score small{font-size:.7em;font-weight:500;color:var(--muted)}
+.slot-r{font-size:.8rem;color:var(--muted);line-height:1.45}
+#slotchart{width:100%;height:auto;display:block;touch-action:pan-y}
+#slotchart text{font-family:var(--f-body);fill:var(--muted)}
 .linkbtn{background:none;border:0;padding:0;color:var(--ink);cursor:pointer;text-decoration:underline;text-underline-offset:3px;font-size:.84rem;text-align:left}
 
 /* résultats */
@@ -216,8 +238,22 @@ tr.isnight td:first-child{box-shadow:inset 3px 0 0 var(--ink);padding-left:8px}
     </div>
 
     <div>
-      <label class="label" for="start" data-i18n="lbl_start">Départ</label>
-      <input type="datetime-local" id="start">
+      <span class="label" data-i18n="lbl_when">Quand</span>
+      <div class="seg" role="group" aria-label="Quand" data-i18n-aria="lbl_when" style="margin-bottom:12px">
+        <button type="button" id="when-fixed" aria-pressed="true" data-i18n="when_fixed">Heure fixe</button>
+        <button type="button" id="when-best" aria-pressed="false" data-i18n="when_best">Meilleur créneau</button>
+      </div>
+      <div id="box-fixed">
+        <label class="label" for="start" data-i18n="lbl_start">Départ</label>
+        <input type="datetime-local" id="start">
+      </div>
+      <div id="box-best" hidden>
+        <label class="label" for="day" data-i18n="lbl_day">Jour</label>
+        <input type="date" id="day">
+        <span class="label" style="margin-top:16px" data-i18n="lbl_avail">Disponibilités</span>
+        <div id="ranges"></div>
+        <button type="button" class="linkbtn" id="addrange" style="margin-top:8px" data-i18n="add_range">+ Ajouter une plage</button>
+      </div>
     </div>
 
     <div>
@@ -350,7 +386,17 @@ const I18N = {
     tail_l:"vent de dos", head_l:"vent de face", map_fail:"La carte n'a pas pu se charger (connexion ?). Le reste fonctionne.",
     t_start:"Départ", t_end:"Arrivée", osm_contrib:"contributeurs OpenStreetMap", cyclo:"CyclOSM (vélo)", topo:"OpenTopoMap (relief)",
     rd_play:"Lire", rd_pause:"Pause", rd_ago:m=>m<=0?"maintenant":"il y a "+m+" min", rd_fc:m=>"prévision +"+m+" min",
-    rd_load:"Chargement du radar…", dplus:"m D+", dminus:"m D−", rd_fail:"Radar indisponible pour le moment.", rd_src:"Radar"
+    rd_load:"Chargement du radar…",
+    lbl_when:"Quand", when_fixed:"Heure fixe", when_best:"Meilleur créneau", lbl_day:"Jour", lbl_avail:"Disponibilités",
+    add_range:"+ Ajouter une plage", from:"De", to:"À", rm_range:"Retirer cette plage", go_best:"Trouver le meilleur créneau",
+    err_day:"Choisis le jour de ta sortie.", err_ranges:"Ajoute au moins une plage de disponibilité.",
+    err_fit:d=>"Aucune plage n'est assez longue pour une sortie de "+d+". Élargis une plage ou réduis la durée.",
+    err_past:"Ces plages sont déjà passées. Choisis un autre jour ou d'autres horaires.",
+    best:"Meilleur", best_slot:"Meilleur créneau", dur:"durée", every_dep:"un départ testé toutes les 15 min",
+    slot_aria:"Note météo de chaque heure de départ possible", rs_storm:"orage", rs_rain:m=>"pluie ≈ "+m+" mm", rs_risk:p=>"risque de pluie "+p+" %",
+    rs_dry:"sec", rs_feel:(a,b)=>"ressenti "+a+" à "+b+"°", rs_head:v=>"vent de face ~"+v+" km/h", rs_tail:v=>"vent de dos ~"+v+" km/h",
+    rs_gust:g=>"rafales "+g+" km/h", rs_night:p=>"nuit "+p+" %",
+    slot_foot:velo=>"Note sur 100 calculée sur toute la sortie : la pluie et l'orage pèsent le plus, puis la température ressentie (idéal "+(velo?"12 à 24°":"5 à 17°")+"), le vent"+(velo?" de face":"")+" et les rafales, et la nuit. Touche une barre ou une carte pour voir le détail de ce départ.", dplus:"m D+", dminus:"m D−", rd_fail:"Radar indisponible pour le moment.", rd_src:"Radar"
   },
   en: {
     eyebrow:"Bike · Trail · Ultra",
@@ -407,7 +453,17 @@ const I18N = {
     tail_l:"tailwind", head_l:"headwind", map_fail:"The map couldn't load (connection?). Everything else works.",
     t_start:"Start", t_end:"Finish", osm_contrib:"OpenStreetMap contributors", cyclo:"CyclOSM (bike)", topo:"OpenTopoMap (terrain)",
     rd_play:"Play", rd_pause:"Pause", rd_ago:m=>m<=0?"now":m+" min ago", rd_fc:m=>"forecast +"+m+" min",
-    rd_load:"Loading radar…", dplus:"m gain", dminus:"m loss", rd_fail:"Radar unavailable right now.", rd_src:"Radar"
+    rd_load:"Loading radar…",
+    lbl_when:"When", when_fixed:"Fixed time", when_best:"Best window", lbl_day:"Day", lbl_avail:"Availability",
+    add_range:"+ Add a time range", from:"From", to:"To", rm_range:"Remove this range", go_best:"Find the best window",
+    err_day:"Pick the day of your outing.", err_ranges:"Add at least one time range.",
+    err_fit:d=>"None of your ranges is long enough for a "+d+" outing. Widen a range or shorten the duration.",
+    err_past:"These ranges are already over. Pick another day or other times.",
+    best:"Best", best_slot:"Best window", dur:"duration", every_dep:"a start tested every 15 min",
+    slot_aria:"Weather score for each possible start time", rs_storm:"thunderstorm", rs_rain:m=>"rain ≈ "+m+" mm", rs_risk:p=>"chance of rain "+p+" %",
+    rs_dry:"dry", rs_feel:(a,b)=>"feels "+a+" to "+b+"°", rs_head:v=>"headwind ~"+v+" km/h", rs_tail:v=>"tailwind ~"+v+" km/h",
+    rs_gust:g=>"gusts "+g+" km/h", rs_night:p=>"dark "+p+" %",
+    slot_foot:velo=>"Score out of 100 over the whole outing: rain and thunderstorms weigh most, then feels-like temperature (ideal "+(velo?"12 to 24°":"5 to 17°")+"), "+(velo?"headwind":"wind")+" and gusts, and darkness. Tap a bar or a card to see that start in detail.", dplus:"m gain", dminus:"m loss", rd_fail:"Radar unavailable right now.", rd_src:"Radar"
   }
 };
 let LANG = (() => { try { const l = localStorage.getItem("meteo-parcours-lang"); if (l === "fr" || l === "en") return l; } catch(e){} return /^fr/i.test(navigator.language || "fr") ? "fr" : "en"; })();
@@ -429,7 +485,7 @@ const ACT = {
   velo:  {speed:25, cup:1.5, cdown:0.5, label:"Vélo"},
   trail: {speed:8,  cup:1.0, cdown:0.0, label:"Trail"}
 };
-const state = {act:"velo", mode:"speed", route:null, last:null};
+const state = {act:"velo", mode:"speed", when:"fixed", route:null, last:null, slots:null};
 
 /* ---------- réglages mémorisés ---------- */
 const store = {
@@ -439,6 +495,7 @@ const store = {
 function saveSettings(){
   store.set({act:state.act, mode:state.mode, speed:$("#speed").value, dh:$("#dh").value, dm:$("#dm").value,
     cup:$("#cup").value, cdown:$("#cdown").value, model:$("#model").value, step:$("#step").value,
+    when:state.when, ranges:readRanges().map(r => [r.sa, r.sb]),
     perAct:{...(store.get().perAct||{}), [state.act]:{speed:$("#speed").value, cup:$("#cup").value, cdown:$("#cdown").value}}});
 }
 function setAct(a, applyDefaults){
@@ -623,8 +680,7 @@ function makeSamples(route, times, stepMin){
 /* ---------- Open-Meteo ---------- */
 const HV = ["temperature_2m","apparent_temperature","precipitation","precipitation_probability","weather_code","cloud_cover","wind_speed_10m","wind_direction_10m","wind_gusts_10m","is_day"];
 const isoDay = t => new Date(t).toISOString().slice(0,10);
-async function fetchWeather(samples, route, model){
-  const t0 = samples[0].t, t1 = samples[samples.length-1].t;
+async function fetchWeather(samples, route, model, t0 = samples[0].t, t1 = samples[samples.length-1].t){
   const q = new URLSearchParams({
     latitude: samples.map(s => s.lat.toFixed(4)).join(","),
     longitude: samples.map(s => s.lon.toFixed(4)).join(","),
@@ -682,6 +738,208 @@ function reliability(t){
   if (h <= 48) return tx("rel_good"); if (h <= 120) return tx("rel_ok"); if (h <= 240) return tx("rel_ind"); return tx("rel_trend");
 }
 
+/* ---------- meilleur créneau ---------- */
+const pad2 = n => String(n).padStart(2, "0");
+const toMin = v => { const m = /^(\d{1,2}):(\d{2})/.exec(v || ""); return m ? (+m[1])*60 + (+m[2]) : null; };
+function readRanges(){
+  return [...document.querySelectorAll("#ranges .range")].map(r => {
+    const [a, b] = r.querySelectorAll("input");
+    return {a: toMin(a.value), b: toMin(b.value), sa: a.value, sb: b.value};
+  }).filter(r => r.a != null && r.b != null);
+}
+function addRange(a, b){
+  const row = document.createElement("div");
+  row.className = "range";
+  row.innerHTML = `<input type="time" value="${a}" step="900" aria-label="${tx("from")}"><span aria-hidden="true">→</span><input type="time" value="${b}" step="900" aria-label="${tx("to")}"><button type="button" class="rm" aria-label="${tx("rm_range")}">×</button>`;
+  row.querySelector(".rm").addEventListener("click", () => { if (document.querySelectorAll("#ranges .range").length > 1){ row.remove(); saveSettings(); autoRun(); } });
+  row.querySelectorAll("input").forEach(i => i.addEventListener("change", () => { saveSettings(); autoRun(); }));
+  $("#ranges").appendChild(row);
+}
+function setWhen(w){
+  state.when = w;
+  $("#when-fixed").setAttribute("aria-pressed", w === "fixed");
+  $("#when-best").setAttribute("aria-pressed", w === "best");
+  $("#box-fixed").hidden = w !== "fixed";
+  $("#box-best").hidden = w !== "best";
+  goLabel(); paceHint();
+}
+function goLabel(){
+  $("#go").textContent = state.when === "best" ? tx("go_best") : tx(state.last ? "update" : "go");
+}
+function dayStart(){
+  const v = $("#day").value; if (!v) return null;
+  const [y, m, d] = v.split("-").map(Number);
+  return new Date(y, m-1, d, 0, 0, 0, 0).getTime();   // minuit, heure locale
+}
+// Pénalités par point de passage (0 = idéal). Plus le total est bas, meilleur est le créneau.
+function slotPenalty(w, rel, act){
+  const r = w.rain || 0, pr = w.prob || 0, c = w.code ?? 0;
+  const storm = c >= 95, snow = (c >= 71 && c <= 77) || c === 85 || c === 86, ice = c === 56 || c === 57 || c === 66 || c === 67;
+  const rain = Math.min(60, r*30) + pr*0.15 + (storm ? 40 : 0) + (snow ? 12 : 0) + (ice ? 25 : 0);
+  const [lo, hi] = act === "velo" ? [12, 24] : [5, 17];
+  const f = w.feel;
+  const temp = f == null ? 0 : Math.max(0, lo - f)*2.2 + Math.max(0, f - hi)*2.2;
+  const g = w.gust || 0;
+  const wind = act === "velo"
+    ? Math.max(0, rel ? rel.head : 0)*0.7 + Math.max(0, g - 45)*0.5
+    : (w.wind || 0)*0.25 + Math.max(0, g - 55)*0.5;
+  const night = w.day === 0 ? 15 : 0;
+  return {rain, temp, wind, night, storm};
+}
+async function findBest(){
+  const route = state.route, T = totalMs(), d0 = dayStart(), ranges = readRanges();
+  if (!route) return;
+  if (!T){ showMsg(tx("err_pace"), "err"); return; }
+  if (!d0){ showMsg(tx("err_day"), "err"); return; }
+  if (!ranges.length){ showMsg(tx("err_ranges"), "err"); return; }
+  const STEP = 15*60000, now = Date.now(), cands = [];
+  let tooShort = 0;
+  for (const r of ranges){
+    const a = d0 + r.a*60000, b = d0 + (r.b > r.a ? r.b : r.b + 1440)*60000;
+    let n = 0;
+    for (let s = a; s + T <= b + 1; s += STEP){ if (s >= now - 5*60000){ cands.push({start:s}); n++; } }
+    if (!n) tooShort++;
+  }
+  if (!cands.length){ showMsg(tooShort ? tx("err_fit", fmtDur(T)) : tx("err_past"), "err"); return; }
+  const tMin = Math.min(...cands.map(c => c.start)), tMax = Math.max(...cands.map(c => c.start)) + T;
+  if (tMax > now + 16*86400000){ showMsg(tx("err_far", fmtDay(tMax)), "err"); return; }
+  saveSettings();
+  const btn = $("#go"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + tx("loading");
+  const out = $("#out");
+  if (state.last && $("#chart")) out.classList.add("busy");
+  else out.innerHTML = `<div class="card loading"><span class="spin"></span> ${tx("computing", n1(route.km))}</div>`;
+  try {
+    // points répartis le long de la trace, avec leur part du temps total (dénivelé compris)
+    const frac = computeTimes(route, 0, 1), ds = route.pts.map(p => p.d);
+    const K = Math.max(8, Math.min(20, Math.round(route.km / 2.5)));
+    const pts = [];
+    for (let k = 0; k < K; k++){
+      const d = route.km * k / (K-1), p = pointAtDist(route, d);
+      const i = Math.min(bsearch(ds, d), ds.length-2), f = (d - ds[i]) / ((ds[i+1]-ds[i]) || 1);
+      p.f = frac[i] + (frac[i+1]-frac[i])*Math.max(0, Math.min(1, f));
+      p.brg = bearing(pointAtDist(route, d-0.4), pointAtDist(route, d+0.4));
+      pts.push(p);
+    }
+    pts.forEach((p, k) => { const a = k ? (pts[k-1].f + p.f)/2 : 0, b = k < K-1 ? (p.f + pts[k+1].f)/2 : 1; p.wt = b - a; });
+    const locs = await fetchWeather(pts, route, $("#model").value, tMin, tMax);
+    cands.forEach(c => {
+      let P = {rain:0, temp:0, wind:0, night:0}, rainMax = 0, mm = 0, pmax = 0, fmin = 99, fmax = -99, head = 0, gmax = 0, nightF = 0, storm = false;
+      pts.forEach((p, k) => {
+        const t = c.start + p.f*T, w = readAt(locs[k] || locs[0], t), rel = relWind({w, brg:p.brg});
+        const q = slotPenalty(w, rel, state.act);
+        for (const key of ["rain","temp","wind","night"]) P[key] += q[key]*p.wt;
+        rainMax = Math.max(rainMax, q.rain);
+        mm += (w.rain || 0) * p.wt * T/3600000;
+        pmax = Math.max(pmax, w.prob || 0);
+        if (w.feel != null){ fmin = Math.min(fmin, w.feel); fmax = Math.max(fmax, w.feel); }
+        head += (rel ? rel.head : 0) * p.wt; gmax = Math.max(gmax, w.gust || 0);
+        if (w.day === 0) nightF += p.wt;
+        storm = storm || q.storm;
+      });
+      P.rain += 0.4*rainMax;   // une seule grosse averse doit compter, même courte
+      c.P = P; c.score = Math.max(0, Math.round(100 - P.rain - P.temp - P.wind - P.night));
+      c.stats = {mm, pmax, fmin, fmax, head, gmax, nightF, storm};
+    });
+    const sorted = cands.slice().sort((a, b) => b.score - a.score || a.start - b.start);
+    const top = [];
+    for (const c of sorted){ if (top.every(o => Math.abs(o.start - c.start) >= 60*60000)) top.push(c); if (top.length === 3) break; }
+    state.slots = {route, T, d0, ranges, cands, top, step:STEP};
+    $("#start").value = toLocalInput(top[0].start);
+    await run();
+  } catch(e){
+    showMsg(e.message && !/fetch/i.test(e.message) ? e.message : tx("err_net"), "err");
+  } finally { out.classList.remove("busy"); btn.disabled = false; goLabel(); }
+}
+function toLocalInput(t){
+  const d = new Date(t);
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+const SCORE_STOPS = [[0,"#C8402C"],[45,"#E0892E"],[65,"#E5B93A"],[80,"#8DBF5A"],[100,"#2E7D52"]];
+function slotReasons(c){
+  const s = c.stats, out = [];
+  if (s.storm) out.push(tx("rs_storm"));
+  if (s.mm >= 0.3) out.push(tx("rs_rain", n1(s.mm)));
+  else if (s.pmax >= 40) out.push(tx("rs_risk", n0(s.pmax)));
+  else out.push(tx("rs_dry"));
+  if (s.fmin < 99) out.push(tx("rs_feel", n0(s.fmin), n0(s.fmax)));
+  if (state.act === "velo"){ if (s.head >= 5) out.push(tx("rs_head", n0(s.head))); else if (s.head <= -5) out.push(tx("rs_tail", n0(-s.head))); }
+  if (s.gmax >= 50) out.push(tx("rs_gust", n0(s.gmax)));
+  if (s.nightF > 0.05) out.push(tx("rs_night", Math.round(s.nightF*100)));
+  return out;
+}
+function slotsHTML(L){
+  const Sl = state.slots;
+  if (state.when !== "best" || !Sl || Sl.route !== L.route) return "";
+  const card = (c, i) => {
+    const sel = c.start === L.start;
+    return `<button type="button" class="slot${sel ? " sel" : ""}" data-start="${c.start}">
+      <span class="slot-k">${i === 0 ? tx("best") : "#" + (i+1)}</span>
+      <span class="slot-t">${fmtH(c.start)}<small> → ${fmtH(c.start + Sl.T)}</small></span>
+      <span class="slot-score"><i style="background:${lerpColor(SCORE_STOPS, c.score)}"></i>${c.score}<small>/100</small></span>
+      <span class="slot-r">${slotReasons(c).join(" · ")}</span>
+    </button>`;
+  };
+  return `<section class="slots" aria-label="${tx("best_slot")}">
+    <div class="sec-h"><h3>${tx("best_slot")}</h3><span class="legend">${fmtDay(Sl.d0)} · ${tx("dur")} ${fmtDur(Sl.T)} · ${tx("every_dep")}</span></div>
+    <div class="slot-row">${Sl.top.map(card).join("")}</div>
+    <div class="chartbox"><svg id="slotchart" role="img" aria-label="${tx("slot_aria")}"></svg><div class="tip" id="slottip" hidden></div></div>
+    <p class="foot" style="margin:10px 0 0">${tx("slot_foot", state.act === "velo")}</p>
+  </section>`;
+}
+function drawSlots(L){
+  const svg = $("#slotchart"); if (!svg) return;
+  const Sl = state.slots, C = Sl.cands;
+  const W = Math.max(320, Math.round(svg.parentNode.clientWidth)), H = 150;
+  const x0 = 34, x1 = W - 10, top = 14, base = H - 26;
+  const tA = Math.min(...Sl.ranges.map(r => Sl.d0 + r.a*60000)), tB = Math.max(...Sl.ranges.map(r => Sl.d0 + (r.b > r.a ? r.b : r.b + 1440)*60000));
+  const X = t => x0 + (x1 - x0) * (t - tA) / ((tB - tA) || 1);
+  const Y = v => base - (base - top) * v / 100;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H);
+  let g = "";
+  // plages dispo : fond clair ; trous : hachures
+  g += `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#D9D9D9" stroke-width="2"/></pattern></defs>`;
+  g += `<rect x="${x0}" y="${top}" width="${x1-x0}" height="${base-top}" fill="url(#hatch)"/>`;
+  Sl.ranges.forEach(r => { const a = Sl.d0 + r.a*60000, b = Sl.d0 + (r.b > r.a ? r.b : r.b + 1440)*60000;
+    g += `<rect x="${X(a).toFixed(1)}" y="${top}" width="${(X(b)-X(a)).toFixed(1)}" height="${base-top}" fill="#FFFFFF"/>`; });
+  [25, 50, 75, 100].forEach(v => { g += `<line x1="${x0}" x2="${x1}" y1="${Y(v)}" y2="${Y(v)}" stroke="#ECECEC"/><text x="${x0-6}" y="${Y(v)+4}" font-size="10" text-anchor="end">${v}</text>`; });
+  const bw = Math.max(3, Math.min(14, (X(tA + Sl.step) - X(tA)) * 0.72));
+  C.forEach(c => {
+    const xx = X(c.start), sel = c.start === L.start;
+    g += `<rect x="${(xx - bw/2).toFixed(1)}" y="${Y(c.score).toFixed(1)}" width="${bw.toFixed(1)}" height="${(base - Y(c.score)).toFixed(1)}" fill="${lerpColor(SCORE_STOPS, c.score)}"${sel ? ' stroke="#0B0B0B" stroke-width="2"' : ""}/>`;
+  });
+  // durée de la sortie sélectionnée
+  const selC = C.find(c => c.start === L.start);
+  if (selC) g += `<line x1="${X(selC.start)}" x2="${X(Math.min(tB, selC.start + Sl.T))}" y1="${base + 7}" y2="${base + 7}" stroke="#0B0B0B" stroke-width="3"/>`;
+  g += `<line x1="${x0}" x2="${x1}" y1="${base}" y2="${base}" stroke="#0B0B0B"/>`;
+  const span = (tB - tA)/3600000, hs = span > 14 ? 3 : span > 7 ? 2 : 1;
+  const h0 = new Date(tA); h0.setMinutes(0, 0, 0);
+  for (let t = h0.getTime(); t <= tB; t += 3600000){
+    if (t < tA) continue; const hh = new Date(t).getHours(); if (hh % hs) continue;
+    g += `<text x="${X(t).toFixed(1)}" y="${H - 4}" font-size="11" text-anchor="middle">${LANG === "fr" ? hh + "h" : pad2(hh) + ":00"}</text>`;
+  }
+  g += `<rect id="slothit" x="${x0}" y="0" width="${x1-x0}" height="${H}" fill="transparent" style="cursor:pointer"/>`;
+  svg.innerHTML = g;
+  const tip = $("#slottip");
+  const near = ev => { const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+    return C.reduce((a, b) => Math.abs(X(b.start) - px) < Math.abs(X(a.start) - px) ? b : a); };
+  const hit = svg.querySelector("#slothit");
+  hit.addEventListener("pointermove", ev => {
+    const c = near(ev), r = svg.getBoundingClientRect();
+    tip.innerHTML = `<b>${fmtH(c.start)} → ${fmtH(c.start + Sl.T)}</b> <span class="m">· ${c.score}/100</span><br>${slotReasons(c).join("<br>")}`;
+    tip.hidden = false;
+    const sx = X(c.start) / W * r.width, bw2 = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(r.width - bw2, sx + (sx > r.width/2 ? -bw2 - 12 : 12))) + "px"; tip.style.top = "0px";
+  });
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; });
+  hit.addEventListener("click", ev => pickSlot(near(ev).start));
+  document.querySelectorAll(".slot").forEach(b => b.addEventListener("click", () => pickSlot(+b.dataset.start)));
+}
+function pickSlot(t){
+  if (state.last && state.last.start === t) return;
+  $("#start").value = toLocalInput(t);
+  run();
+}
+
 /* ---------- run ---------- */
 async function run(){
   const route = state.route, start = startTime(), T = totalMs();
@@ -705,7 +963,7 @@ async function run(){
     render(state.last);
   } catch(e){
     showMsg(e.message && !/fetch/i.test(e.message) ? e.message : tx("err_net"), "err");
-  } finally { out.classList.remove("busy"); btn.disabled = false; btn.textContent = tx(state.last ? "update" : "go"); }
+  } finally { out.classList.remove("busy"); btn.disabled = false; goLabel(); }
 }
 function showMsg(text, kind){
   $("#out").innerHTML = `<div class="msg" data-kind="${kind||"info"}">${esc(text)}</div>`;
@@ -742,7 +1000,7 @@ function render(L){
   if (!alerts.length) alerts.push(`<span class="chip">${tx("a_none")}</span>`);
 
   const modelName = $("#model").selectedOptions[0].textContent;
-  $("#out").innerHTML = `
+  $("#out").innerHTML = slotsHTML(L) + `
     <div class="routehead"><h2>${esc(routeName(route))}</h2><span>${n1(route.km)} km${route.hasEle ? " · " + Math.round(route.up) + " " + tx("dplus") : ""} · ${tx("start_on")} ${fmtDay(start)} ${fmtH(start)}</span></div>
     <section class="stats" aria-label="${tx("summary")}">
       <div class="stat"><div class="k">${tx("k_start", fmtDay(start))}</div><div class="v">${fmtH(start)}</div><div class="s">${tx("arrival")} ${fmtH(end)} · ${fmtDur(end-start)} · ${n1(route.km/((end-start)/3600000))} km/h <span class="reli">${rel}</span></div></div>
@@ -779,6 +1037,7 @@ function render(L){
     </section>
     <p class="foot">${tx("foot", esc(modelName), !route.hasEle, !!(parseFloat($("#cup").value)||parseFloat($("#cdown").value)))}</p>`;
   drawChart(L);
+  drawSlots(L);
   drawMap(L);
 }
 function arrowSVG(diff){
@@ -1021,7 +1280,7 @@ function drawChart(L){
   svg.addEventListener("pointerleave", () => { tip.hidden = true; cur.setAttribute("visibility", "hidden"); });
 }
 let _rz = null;
-window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(() => { if (state.last && $("#chart")) drawChart(state.last); }, 150); });
+window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(() => { if (state.last && $("#chart")){ drawChart(state.last); drawSlots(state.last); } }, 150); });
 
 /* ---------- carte ---------- */
 const OSM_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -1294,12 +1553,16 @@ $("#act-trail").addEventListener("click", () => { saveSettings(); setAct("trail"
 $("#mode-speed").addEventListener("click", () => setMode("speed"));
 $("#mode-time").addEventListener("click", () => setMode("time"));
 ["speed","dh","dm","start","cup","cdown"].forEach(id => $("#"+id).addEventListener("input", paceHint));
-$("#go").addEventListener("click", run);
+$("#go").addEventListener("click", () => state.when === "best" ? findBest() : run());
 let _auto = null;
-const autoRun = () => { if (!state.route || !state.last) return; clearTimeout(_auto); _auto = setTimeout(run, 700); };
-["speed","dh","dm","start","cup","cdown"].forEach(id => $("#"+id).addEventListener("change", autoRun));
+const autoRun = () => { if (!state.route || !state.last) return; clearTimeout(_auto); _auto = setTimeout(() => state.when === "best" ? findBest() : run(), 700); };
+["speed","dh","dm","cup","cdown","day"].forEach(id => $("#"+id).addEventListener("change", autoRun));
+$("#start").addEventListener("change", () => { if (state.when === "fixed") autoRun(); });
 ["model","step"].forEach(id => $("#"+id).addEventListener("change", autoRun));
 ["act-velo","act-trail","mode-speed","mode-time"].forEach(id => $("#"+id).addEventListener("click", autoRun));
+$("#when-fixed").addEventListener("click", () => { setWhen("fixed"); saveSettings(); if (state.last) render(state.last); });
+$("#when-best").addEventListener("click", () => { setWhen("best"); saveSettings(); if (state.route && state.last) findBest(); });
+$("#addrange").addEventListener("click", () => { addRange("17:00", "21:00"); saveSettings(); });
 $("#out").addEventListener("change", e => {
   if (!map || !layers || !state.last) return;
   if (e.target.id === "mapcolor"){ mapPref.set({color:e.target.value}); drawTrace(state.last, e.target.value); }
@@ -1312,7 +1575,8 @@ function setLang(l){
   if (l === LANG) return;
   LANG = l; try { localStorage.setItem("meteo-parcours-lang", l); } catch(e){}
   applyStatic(); routeUI(); paceHint();
-  $("#go").textContent = tx(state.last ? "update" : "go");
+  goLabel();
+  document.querySelectorAll("#ranges .range").forEach(r => { const [a, b] = r.querySelectorAll("input"); a.setAttribute("aria-label", tx("from")); b.setAttribute("aria-label", tx("to")); r.querySelector(".rm").setAttribute("aria-label", tx("rm_range")); });
   if (state.last && $("#chart")) render(state.last);
 }
 document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => setLang(b.dataset.lang)));
@@ -1324,6 +1588,8 @@ const saved = store.get();
 const d = new Date(); d.setDate(d.getDate()+1); d.setHours(8,0,0,0);
 const pad = n => String(n).padStart(2,"0");
 $("#start").value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T08:00`;
+$("#day").value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+(saved.ranges && saved.ranges.length ? saved.ranges : [["09:00","17:00"]]).forEach(([a, b]) => addRange(a, b));
 if (saved.speed) $("#speed").value = saved.speed;
 if (saved.dh) $("#dh").value = saved.dh;
 if (saved.dm) $("#dm").value = saved.dm;
@@ -1333,6 +1599,7 @@ setAct(saved.act || "velo", !saved.act);
 if (saved.cup) $("#cup").value = saved.cup;
 if (saved.cdown) $("#cdown").value = saved.cdown;
 setMode(saved.mode || "speed");
+setWhen(saved.when === "best" ? "best" : "fixed");
 })();
 </script>
 </body>
