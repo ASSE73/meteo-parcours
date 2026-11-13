@@ -403,7 +403,11 @@ const I18N = {
     wind_arrows:"Flèches de vent", pictos:"Pictos", radar:"Radar pluie",
     map_foot:"Les flèches montrent où souffle le vent ; leur taille suit sa force, leur couleur dit s'il est de face (rouge) ou de dos (vert) pour toi. Fond de carte au choix en haut à droite.",
     table:"Point par point", every:s=>"un point toutes les "+s+" min",
-    th:["Km","Heure","Alt.","Ciel","Temp.","Ressentie","Pluie","Proba","Vent","Rafales","Relatif"],
+    th:["Km","Heure","Alt.","Ciel","Temp.","Ressentie","Pluie","Proba","Vent","Rafales","Relatif","Iso 0 °C"],
+    iso0:"iso 0 °C", snowl:"pluie / neige", snowl_s:"neige", th_sl:"Limite pluie-neige", a_iso:(a,b)=>a===b?`Iso 0 °C vers ${a} m`:`Iso 0 °C entre ${a} et ${b} m`, a_snowabove:h=>`Neige possible au-dessus de ~${h} m`,
+    iso_above:h=>`iso 0 °C au-dessus, ~${h} m`, iso_below:h=>`iso 0 °C sous la trace, ~${h} m`, iso_tip:"iso 0 °C", ph_snow:"neige", ph_rain:"pluie", ph_mix:"pluie et neige mêlées", then:" puis ",
+    pa_phase:(ph,e)=>`À ${e} m : précipitations sous forme de ${ph}`,
+    iso_foot:" La limite pluie-neige est estimée à 300 m sous l'iso 0 °C ; en réalité elle varie de 0 à 600 m selon l'humidité de l'air et l'intensité des précipitations.",
     foot:(m,noEle,adj)=>`Données <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · modèle : ${m} · températures corrigées à l'altitude de la trace${noEle?" (altitude du terrain, la trace n'en contient pas)":""}. Le vent est donné à 10 m du sol, souvent un peu plus fort que ce que tu ressens sur la route. Horaires calculés à partir de ta vitesse${adj?", ajustés au dénivelé":""}.`,
     s_down:"descente", p_ele:"Profil et pente", p_temp:"Température · ressentie", p_rain:"Pluie · probabilité", p_wind:"Vent dans ton axe",
     freeze:"0° gel", max:"max", min:"min", no_rain:"Pas de pluie prévue sur le parcours", face:"face", dos:"dos",
@@ -480,7 +484,11 @@ const I18N = {
     wind_arrows:"Wind arrows", pictos:"Icons", radar:"Rain radar",
     map_foot:"Arrows show where the wind blows; their size follows its strength, their colour tells you if it's a headwind (red) or tailwind (green). Pick a base map at the top right.",
     table:"Point by point", every:s=>"one point every "+s+" min",
-    th:["Km","Time","Elev.","Sky","Temp.","Feels like","Rain","Chance","Wind","Gusts","Relative"],
+    th:["Km","Time","Elev.","Sky","Temp.","Feels like","Rain","Chance","Wind","Gusts","Relative","0 °C level"],
+    iso0:"0 °C level", snowl:"rain / snow", snowl_s:"snow", th_sl:"Snow line", a_iso:(a,b)=>a===b?`0 °C level around ${a} m`:`0 °C level between ${a} and ${b} m`, a_snowabove:h=>`Snow possible above ~${h} m`,
+    iso_above:h=>`0 °C level above, ~${h} m`, iso_below:h=>`0 °C level below the route, ~${h} m`, iso_tip:"0 °C level", ph_snow:"snow", ph_rain:"rain", ph_mix:"mixed rain and snow", then:", then ",
+    pa_phase:(ph,e)=>`At ${e} m: precipitation falling as ${ph}`,
+    iso_foot:" The snow line is estimated 300 m below the 0 °C level; in reality it ranges from 0 to 600 m depending on air humidity and precipitation intensity.",
     foot:(m,noEle,adj)=>`Data <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · model: ${m} · temperatures adjusted to the route's elevation${noEle?" (terrain elevation, the route has none)":""}. Wind is given 10 m above ground, often a bit stronger than what you feel on the road. Times are based on your speed${adj?", adjusted for elevation":""}.`,
     s_down:"downhill", p_ele:"Profile and gradient", p_temp:"Temperature · feels like", p_rain:"Rain · chance", p_wind:"Wind along your heading",
     freeze:"0° freezing", max:"max", min:"min", no_rain:"No rain expected along the route", face:"head", dos:"tail",
@@ -728,7 +736,7 @@ function makeSamples(route, times, stepMin){
 }
 
 /* ---------- Open-Meteo ---------- */
-const HV = ["temperature_2m","apparent_temperature","precipitation","precipitation_probability","weather_code","cloud_cover","wind_speed_10m","wind_direction_10m","wind_gusts_10m","is_day","rain","snowfall"];
+const HV = ["temperature_2m","apparent_temperature","precipitation","precipitation_probability","weather_code","cloud_cover","wind_speed_10m","wind_direction_10m","wind_gusts_10m","is_day","rain","snowfall","freezing_level_height"];
 const isoDay = t => new Date(t).toISOString().slice(0,10);
 async function fetchWeather(samples, route, model, t0 = samples[0].t, t1 = samples[samples.length-1].t){
   const q = new URLSearchParams({
@@ -762,7 +770,7 @@ function readAt(loc, t){
     rain: pick("precipitation", after), prob: pick("precipitation_probability", after),
     code: pick("weather_code", near), cloud: lin("cloud_cover"),
     wind: lin("wind_speed_10m"), gust: lin("wind_gusts_10m"), wdir: pick("wind_direction_10m", near),
-    day: pick("is_day", near), liq: pick("rain", after), snow: pick("snowfall", after)
+    day: pick("is_day", near), liq: pick("rain", after), snow: pick("snowfall", after), iso: lin("freezing_level_height")
   };
 }
 const WMO = (c, day) => {
@@ -790,6 +798,8 @@ function reliability(t){
 
 /* ---------- meilleur créneau ---------- */
 const pad2 = n => String(n).padStart(2, "0");
+const r50 = v => v == null ? null : Math.round(v/50)*50;
+const SNOW_GAP = 300;   // limite pluie-neige ≈ iso 0 °C − 300 m
 const toMin = v => { const m = /^(\d{1,2}):(\d{2})/.exec(v || ""); return m ? (+m[1])*60 + (+m[2]) : null; };
 function readRanges(){
   return [...document.querySelectorAll("#ranges .range")].map(r => {
@@ -1097,6 +1107,17 @@ function renderPlace(L){
   const fog = S.find(s => s.w.code === 45 || s.w.code === 48);
   if (fog) alerts.push(`<span class="chip night">${tx("pa_fog", fmtH(fog.t))}</span>`);
   if (S.some(s => s.w.day === 0)) alerts.push(`<span class="chip night">${tx("pa_night")}</span>`);
+  const isos = S.map(s => s.w.iso).filter(v => v != null);
+  if (isos.length){
+    alerts.unshift(`<span class="chip cold">${tx("a_iso", r50(Math.min(...isos)), r50(Math.max(...isos)))}</span>`);
+    const pr = S.filter(s => (s.w.rain || 0) >= 0.1 && s.w.iso != null);
+    if (pr.length && R.ele != null){
+      const phases = [];
+      pr.forEach(s => { const gap = s.w.iso - R.ele, ph = gap < SNOW_GAP - 150 ? "ph_snow" : gap > SNOW_GAP + 150 ? "ph_rain" : "ph_mix"; if (phases[phases.length-1] !== ph) phases.push(ph); });
+      const allRain = phases.every(ph => ph === "ph_rain");
+      alerts.unshift(`<span class="chip ${allRain ? "rain" : "cold"}">${tx("pa_phase", phases.map(ph => tx(ph)).join(tx("then")), n0(R.ele))}</span>`);
+    }
+  }
   if (!alerts.length) alerts.push(`<span class="chip">${tx("a_none")}</span>`);
   const showSnow = state.act === "ski" || cm > 0.05;
   const rel = reliability(start);
@@ -1113,14 +1134,14 @@ function renderPlace(L){
     <section class="card">
       <div class="sec-h"><h3>${tx("hourly")}</h3><span class="legend">${tx("every", step)}</span></div>
       <div class="tablewrap"><table>
-        <thead><tr><th>${tx("th")[1]}</th><th>${tx("th")[3]}</th><th>${tx("th")[4]}</th><th>${tx("th")[5]}</th><th>${tx("th")[6]}</th>${showSnow ? `<th>${tx("th_snow")}</th>` : ""}<th>${tx("th")[7]}</th><th>${tx("th")[8]}</th><th>${tx("th")[9]}</th><th>${tx("th_cloud")}</th></tr></thead>
+        <thead><tr><th>${tx("th")[1]}</th><th>${tx("th")[3]}</th><th>${tx("th")[4]}</th><th>${tx("th")[5]}</th><th>${tx("th")[6]}</th>${showSnow ? `<th>${tx("th_snow")}</th>` : ""}<th>${tx("th")[7]}</th><th>${tx("th")[8]}</th><th>${tx("th")[9]}</th><th>${tx("th_cloud")}</th><th>${tx("th")[11]}</th><th>${tx("th_sl")}</th></tr></thead>
         <tbody>${S.map(s => { const [lab, ico] = WMO(s.w.code, s.w.day); const wetR = (s.w.rain || 0) >= 0.2 || (s.w.prob || 0) >= 50;
           return `<tr class="${wetR ? "wet" : ""} ${s.w.day === 0 ? "isnight" : ""}"><td>${fmtH(s.t)}</td><td>${ico} ${lab}</td><td>${n1(s.w.temp)}°</td><td>${n1(s.w.feel)}°</td>
             <td>${n1(showSnow ? (s.w.liq ?? s.w.rain) : s.w.rain)} mm</td>${showSnow ? `<td>${n1(s.w.snow || 0)} cm</td>` : ""}<td>${n0(s.w.prob)} %</td>
-            <td>${n0(s.w.wind)} km/h ${compass(s.w.wdir)}</td><td>${n0(s.w.gust)}</td><td>${n0(s.w.cloud)} %</td></tr>`; }).join("")}</tbody>
+            <td>${n0(s.w.wind)} km/h ${compass(s.w.wdir)}</td><td>${n0(s.w.gust)}</td><td>${n0(s.w.cloud)} %</td><td>${s.w.iso == null ? "—" : r50(s.w.iso) + " m"}</td><td>${s.w.iso == null ? "—" : "~" + r50(s.w.iso - SNOW_GAP) + " m"}</td></tr>`; }).join("")}</tbody>
       </table></div>
     </section>
-    <p class="foot">${tx("place_foot", esc(modelName), R.ele != null ? n0(R.ele) : null)}</p>`;
+    <p class="foot">${tx("place_foot", esc(modelName), R.ele != null ? n0(R.ele) : null)}${tx("iso_foot")}</p>`;
   drawSlots(L);
 }
 const renderAny = L => isPlace(L) ? renderPlace(L) : render(L);
@@ -1183,6 +1204,13 @@ function render(L){
   if (totMin && headMin/totMin >= 0.3) alerts.push(`<span class="chip head">${tx("a_head", Math.round(headMin/totMin*100))}</span>`);
   if ((gustS.w.gust||0) >= 50) alerts.push(`<span class="chip head">${tx("a_gust", n0(gustS.w.gust), n0(gustS.d))}</span>`);
   if (night.length) alerts.push(`<span class="chip night">${tx("a_night", n0(night[0].d), night.length < S.length ? n0(night[night.length-1].d) : null)}</span>`);
+  const isos = S.map(s => s.w.iso).filter(v => v != null);
+  if (isos.length && route.hasEle){
+    const iMin = r50(Math.min(...isos)), iMax = r50(Math.max(...isos)), eMax = Math.max(...route.pts.map(p => p.es));
+    if (iMin < eMax + 400) alerts.push(`<span class="chip cold">${tx("a_iso", iMin, iMax)}</span>`);
+    const snowS = S.filter(s => s.w.iso != null && ((s.w.rain || 0) >= 0.1 || (s.w.snow || 0) > 0) && s.ele != null && s.ele > s.w.iso - SNOW_GAP);
+    if (snowS.length) alerts.push(`<span class="chip cold">${tx("a_snowabove", r50(Math.min(...snowS.map(s => s.w.iso - SNOW_GAP))))}</span>`);
+  }
   if (!alerts.length) alerts.push(`<span class="chip">${tx("a_none")}</span>`);
 
   const modelName = $("#model").selectedOptions[0].textContent;
@@ -1221,7 +1249,7 @@ function render(L){
         <tbody>${S.map(rowHTML).join("")}</tbody>
       </table></div>
     </section>
-    <p class="foot">${tx("foot", esc(modelName), !route.hasEle, !!(parseFloat($("#cup").value)||parseFloat($("#cdown").value)))}</p>`;
+    <p class="foot">${tx("foot", esc(modelName), !route.hasEle, !!(parseFloat($("#cup").value)||parseFloat($("#cdown").value)))}${tx("iso_foot")}</p>`;
   drawChart(L);
   drawSlots(L);
   drawMap(L);
@@ -1240,7 +1268,7 @@ function rowHTML(s){
     <td title="${lab}">${ico} ${lab}</td><td>${n1(s.w.temp)}°</td><td>${n1(s.w.feel)}°</td>
     <td>${s.w.rain==null?"—":n1(s.w.rain)+" mm"}</td><td>${s.w.prob==null?"—":n0(s.w.prob)+" %"}</td>
     <td>${n0(s.w.wind)} km/h</td><td>${n0(s.w.gust)}</td>
-    <td>${r ? `<span class="wind-rel ${cls}">${arrowSVG(r.diff)} ${r.lab}</span>` : "—"}</td></tr>`;
+    <td>${r ? `<span class="wind-rel ${cls}">${arrowSVG(r.diff)} ${r.lab}</span>` : "—"}</td><td>${s.w.iso == null ? "—" : r50(s.w.iso) + " m"}</td></tr>`;
 }
 
 const SLOPES = [
@@ -1323,7 +1351,12 @@ function drawChart(L){
       const bin = route.km / nb, E = [];
       for (let i = 0; i <= nb; i++) E.push(pointAtDist(route, i*bin).es);
       const emin = Math.min(...E), emax = Math.max(...E), rng = Math.max(50, emax - emin);
-      const lo = emin - rng*0.04, hi = emax + rng*0.22;
+      let lo = emin - rng*0.04, hi = emax + rng*0.22;
+      const ISO = S.filter(s => s.w.iso != null);
+      const isoMin = ISO.length ? Math.min(...ISO.map(s => s.w.iso)) : null, isoMax = ISO.length ? Math.max(...ISO.map(s => s.w.iso)) : null;
+      // on élargit l'échelle pour montrer l'iso 0 s'il n'est pas trop loin de la trace
+      if (ISO.length && isoMin < emax + Math.max(500, rng*0.6)) hi = Math.max(hi, Math.min(isoMax, emax + Math.max(500, rng*0.6)) + rng*0.1);
+      if (ISO.length && isoMax - SNOW_GAP > emin - 400 && isoMin - SNOW_GAP < lo) lo = Math.max(isoMin - SNOW_GAP - rng*0.05, emin - 400);
       const Y = v => p.y + p.h - p.h * (v - lo) / (hi - lo);
       const st = niceStep(hi - lo, narrow ? 3 : 4);
       for (let v = Math.ceil(lo/st)*st; v <= hi; v += st){ g += hline(Y(v), true) + lab(x0-8, Y(v)+4, Math.round(v)); }
@@ -1336,6 +1369,22 @@ function drawChart(L){
       L._bin = bin;
       g += `<path d="${E.map((e,i) => `${i?"L":"M"}${X(i*bin).toFixed(1)},${Y(e).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/>`;
       g += `<line x1="${x0}" x2="${x1}" y1="${p.y+p.h}" y2="${p.y+p.h}" stroke="var(--ink)" stroke-opacity=".5"/>`;
+      if (ISO.length){
+        const clampY = v => Math.max(p.y, Math.min(p.y + p.h, Y(v)));
+        const line = off => ISO.map((s, i) => `${i ? "L" : "M"}${X(s.d).toFixed(1)},${clampY(s.w.iso - off).toFixed(1)}`).join(" ");
+        const inView = v => v >= lo && v <= hi;
+        if (ISO.some(s => inView(s.w.iso - SNOW_GAP))){
+          g += `<path d="${line(SNOW_GAP)}" fill="none" stroke="var(--cold)" stroke-width="1.3" stroke-dasharray="2 4" stroke-opacity=".8"/>`;
+          const e = ISO[ISO.length-1]; g += `<text x="${x1+6}" y="${(clampY(e.w.iso - SNOW_GAP)+4).toFixed(1)}" font-size="10" style="fill:var(--cold)">${tx("snowl_s")}</text>`;
+        }
+        if (ISO.some(s => inView(s.w.iso))){
+          g += `<path d="${line(0)}" fill="none" stroke="var(--cold)" stroke-width="1.8" stroke-dasharray="6 4"/>`;
+          const e = ISO[ISO.length-1]; g += `<text x="${x1+6}" y="${(clampY(e.w.iso)+4).toFixed(1)}" font-size="10" font-weight="600" style="fill:var(--cold)">0 °C</text>`;
+        } else {
+          const msg = isoMin > hi ? tx("iso_above", r50(isoMin)) : tx("iso_below", r50(isoMax));
+          g += `<text x="${x1}" y="${(isoMin > hi ? p.y + 12 : p.y + p.h - 6)}" font-size="10.5" text-anchor="end" style="fill:var(--cold)">${msg}</text>`;
+        }
+      }
       // sommets : maxima locaux avec au moins 120 m de dénivelé de part et d'autre
       const w = Math.max(2, Math.round(nb*0.025)), peaks = [];
       for (let i = 1; i < nb; i++){
@@ -1454,7 +1503,8 @@ function drawChart(L){
     tip.innerHTML = `<b>${fmtH(t)}</b> <span class="m">· km ${n1(d)}${route.hasEle ? " · " + n0(pos.es) + " m" + (slope != null ? " · " + (slope >= 0 ? "+" : "") + n1(slope) + " %" : "") : ""}</span><br>`
       + `${ico} ${lb} · <b style="font-size:.95rem">${n1(s.w.temp)}°</b> <span class="m">${tx("felt")} ${n1(s.w.feel)}°</span><br>`
       + `${tx("rain_w")} ${n1(s.w.rain)} mm/h <span class="m">· ${n0(s.w.prob)} %</span><br>`
-      + `${tx("wind_w")} ${n0(s.w.wind)} km/h${s.rel ? tx("of") + s.rel.lab : ""} <span class="m">· ${tx("gusts")} ${n0(s.w.gust)}</span>`;
+      + `${tx("wind_w")} ${n0(s.w.wind)} km/h${s.rel ? tx("of") + s.rel.lab : ""} <span class="m">· ${tx("gusts")} ${n0(s.w.gust)}</span>`
+      + (s.w.iso != null ? `<br>${tx("iso_tip")} ${r50(s.w.iso)} m <span class="m">· ${tx("snowl")} ~${r50(s.w.iso - SNOW_GAP)} m</span>` : "");
     tip.hidden = false;
     const bw = tip.offsetWidth, sx = xx / W * r.width;
     tip.style.left = Math.max(0, Math.min(r.width - bw, sx + (sx > r.width/2 ? -bw - 14 : 14))) + "px";
