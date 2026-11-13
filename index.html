@@ -83,6 +83,14 @@ input:focus-visible,select:focus-visible,button:focus-visible,.drop:focus-within
 
 /* contrôles */
 .seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--ink)}
+.seg.seg3{grid-template-columns:1fr 1fr 1fr}
+.seg[hidden]{display:none}
+.placesearch{position:relative}
+.placesearch input{width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;font-size:1rem}
+.placeres{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--ink);border-top:0;max-height:300px;overflow:auto}
+.placeres button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line-soft);background:#fff;padding:10px 12px;cursor:pointer}
+.placeres button:hover,.placeres button:focus-visible{background:#F4F4F4}
+.placeres button span{font-size:.78rem;color:var(--muted)}
 .seg button{border:0;background:transparent;padding:9px 4px;cursor:pointer;font-weight:500;font-size:.88rem;color:var(--ink)}
 .seg button+button{border-left:1px solid var(--ink)}
 .seg button[aria-pressed=true]{background:var(--ink);color:#fff}
@@ -219,7 +227,23 @@ tr.isnight td:first-child{box-shadow:inset 3px 0 0 var(--ink);padding-left:8px}
 <div class="wrap">
   <aside class="card" aria-label="Réglages" data-i18n-aria="settings">
     <div>
-      <span class="label" data-i18n="lbl_trace">Trace</span>
+      <span class="label" data-i18n="lbl_where">Où</span>
+      <div class="seg" role="group" aria-label="Où" data-i18n-aria="lbl_where" style="margin-bottom:12px">
+        <button type="button" id="src-gpx" aria-pressed="true" data-i18n="src_gpx">Trace GPX</button>
+        <button type="button" id="src-place" aria-pressed="false" data-i18n="src_place">Lieu</button>
+      </div>
+      <div id="box-place" hidden>
+        <div class="placesearch">
+          <input type="search" id="placeq" autocomplete="off" spellcheck="false" placeholder="Ville, station, col…" data-i18n-ph="place_ph" aria-label="Chercher un lieu" data-i18n-aria="place_aria">
+          <div id="placeres" class="placeres" hidden></div>
+        </div>
+        <button type="button" class="linkbtn" id="geoloc" style="margin-top:8px" data-i18n="use_pos">Utiliser ma position</button>
+        <p class="routeinfo" id="placeinfo" style="margin:10px 0 0"><span data-i18n="noplace">Aucun lieu choisi.</span></p>
+        <label class="label" for="placeele" style="margin-top:16px" data-i18n="lbl_alt">Altitude</label>
+        <div class="dur"><input type="number" id="placeele" step="10" min="-400" max="8800" placeholder="—"><span>m</span></div>
+        <p class="hint" data-i18n="ele_hint">La température est calculée à cette altitude. Pour le ski, mets l'altitude où tu passeras le plus de temps.</p>
+      </div>
+      <div id="box-gpx">
       <label class="drop" id="drop">
         <input type="file" id="gpx" accept=".gpx,application/gpx+xml,application/xml,text/xml">
         <span class="drop-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -227,13 +251,15 @@ tr.isnight td:first-child{box-shadow:inset 3px 0 0 var(--ink);padding-left:8px}
         <small id="drop-s" data-i18n="drop_s">ou le glisser ici (export Strava, Komoot…)</small>
       </label>
       <p class="routeinfo" style="margin:8px 0 0"><span id="routeinfo"><span data-i18n="noroute">Aucune trace.</span></span> <button class="linkbtn" id="demo" type="button" data-i18n="demo">Charger l'exemple Albertville → Roselend → Bourg-St-Maurice</button></p>
+      </div>
     </div>
 
     <div>
       <span class="label" data-i18n="lbl_act">Activité</span>
-      <div class="seg" role="group" aria-label="Activité" data-i18n-aria="lbl_act">
+      <div class="seg seg3" role="group" aria-label="Activité" data-i18n-aria="lbl_act">
         <button type="button" id="act-velo" aria-pressed="true" data-i18n="velo">Vélo</button>
         <button type="button" id="act-trail" aria-pressed="false">Trail</button>
+        <button type="button" id="act-ski" aria-pressed="false" data-i18n="ski">Ski</button>
       </div>
     </div>
 
@@ -257,8 +283,8 @@ tr.isnight td:first-child{box-shadow:inset 3px 0 0 var(--ink);padding-left:8px}
     </div>
 
     <div>
-      <span class="label" data-i18n="lbl_pace">Allure</span>
-      <div class="seg" role="group" aria-label="Mode d'allure" data-i18n-aria="pace_mode" style="margin-bottom:8px">
+      <span class="label" id="lbl-pace">Allure</span>
+      <div class="seg" id="pace-seg" role="group" aria-label="Mode d'allure" data-i18n-aria="pace_mode" style="margin-bottom:8px">
         <button type="button" id="mode-speed" aria-pressed="true" data-i18n="mode_speed">Vitesse moyenne</button>
         <button type="button" id="mode-time" aria-pressed="false" data-i18n="mode_time">Temps prévu</button>
       </div>
@@ -277,7 +303,7 @@ tr.isnight td:first-child{box-shadow:inset 3px 0 0 var(--ink);padding-left:8px}
     <details id="adv">
       <summary data-i18n="adv">Réglages avancés</summary>
       <div class="inner">
-        <div>
+        <div id="adv-elev">
           <span class="label" data-i18n="lbl_elev">Effet du dénivelé</span>
           <div class="row2">
             <div><label class="hint" for="cup" data-i18n="cup">Montée : km en plus / 100 m D+</label><input type="number" id="cup" min="0" max="5" step="0.1" value="1.5"></div>
@@ -387,6 +413,16 @@ const I18N = {
     t_start:"Départ", t_end:"Arrivée", osm_contrib:"contributeurs OpenStreetMap", cyclo:"CyclOSM (vélo)", topo:"OpenTopoMap (relief)",
     rd_play:"Lire", rd_pause:"Pause", rd_ago:m=>m<=0?"maintenant":"il y a "+m+" min", rd_fc:m=>"prévision +"+m+" min",
     rd_load:"Chargement du radar…",
+    lbl_where:"Où", src_gpx:"Trace GPX", src_place:"Lieu", place_ph:"Ville, station, col…", place_aria:"Chercher un lieu",
+    use_pos:"Utiliser ma position", noplace:"Aucun lieu choisi.", lbl_alt:"Altitude", lbl_dur:"Durée de l'activité", ski:"Ski",
+    ele_hint:"La température est calculée à cette altitude. Pour le ski, mets l'altitude où tu passeras le plus de temps.",
+    no_result:"Aucun lieu trouvé.", geo_no:"La localisation n'est pas disponible sur cet appareil.", geo_wait:"Localisation…",
+    geo_denied:"Localisation refusée ou impossible. Cherche le lieu par son nom.", my_pos:"Ma position",
+    computing_place:n=>"Météo à "+n+"…", k_slot:"Créneau", k_until:h=>"jusqu'à "+h, k_precip:"Neige", hourly:"Heure par heure",
+    th_snow:"Neige", th_cloud:"Nuages", pa_rain:h=>"Pluie possible dès "+h, pa_storm:h=>"Orage prévu vers "+h, pa_frost:t=>"Gel : jusqu'à "+t+" °C",
+    pa_gust:g=>"Rafales jusqu'à "+g+" km/h", pa_snow:h=>"Neige dès "+h, pa_fog:h=>"Brouillard vers "+h, pa_night:"Une partie de nuit",
+    place_foot:(m,e)=>`Données <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · modèle : ${m}${e!=null?" · températures calculées à "+e+" m":""}. Le vent est donné à 10 m du sol ; en crête il peut être nettement plus fort.`,
+    rs_snow:c=>"neige ≈ "+c+" cm", rs_vis:"visibilité réduite",
     lbl_when:"Quand", when_fixed:"Heure fixe", when_best:"Meilleur créneau", lbl_day:"Jour", lbl_avail:"Disponibilités",
     add_range:"+ Ajouter une plage", from:"De", to:"À", rm_range:"Retirer cette plage", go_best:"Trouver le meilleur créneau",
     err_day:"Choisis le jour de ta sortie.", err_ranges:"Ajoute au moins une plage de disponibilité.",
@@ -396,7 +432,7 @@ const I18N = {
     slot_aria:"Note météo de chaque heure de départ possible", rs_storm:"orage", rs_rain:m=>"pluie ≈ "+m+" mm", rs_risk:p=>"risque de pluie "+p+" %",
     rs_dry:"sec", rs_feel:(a,b)=>"ressenti "+a+" à "+b+"°", rs_head:v=>"vent de face ~"+v+" km/h", rs_tail:v=>"vent de dos ~"+v+" km/h",
     rs_gust:g=>"rafales "+g+" km/h", rs_night:p=>"nuit "+p+" %",
-    slot_foot:velo=>"Note sur 100 calculée sur toute la sortie : la pluie et l'orage pèsent le plus, puis la température ressentie (idéal "+(velo?"12 à 24°":"5 à 17°")+"), le vent"+(velo?" de face":"")+" et les rafales, et la nuit. Touche une barre ou une carte pour voir le détail de ce départ.", dplus:"m D+", dminus:"m D−", rd_fail:"Radar indisponible pour le moment.", rd_src:"Radar"
+    slot_foot:a=>a==="ski"?"Note sur 100 calculée sur toute la sortie : la pluie et l'orage pèsent le plus, puis le vent et les rafales, le brouillard et les nuages bas, la température ressentie (idéal −8 à 4°), les chutes de neige et la nuit. Touche une barre ou une carte pour voir le détail.":"Note sur 100 calculée sur toute la sortie : la pluie et l'orage pèsent le plus, puis la température ressentie (idéal "+(a==="velo"?"12 à 24°":"5 à 17°")+"), le vent"+(a==="velo"?" de face":"")+" et les rafales, et la nuit. Touche une barre ou une carte pour voir le détail de ce départ.", dplus:"m D+", dminus:"m D−", rd_fail:"Radar indisponible pour le moment.", rd_src:"Radar"
   },
   en: {
     eyebrow:"Bike · Trail · Ultra",
@@ -454,6 +490,16 @@ const I18N = {
     t_start:"Start", t_end:"Finish", osm_contrib:"OpenStreetMap contributors", cyclo:"CyclOSM (bike)", topo:"OpenTopoMap (terrain)",
     rd_play:"Play", rd_pause:"Pause", rd_ago:m=>m<=0?"now":m+" min ago", rd_fc:m=>"forecast +"+m+" min",
     rd_load:"Loading radar…",
+    lbl_where:"Where", src_gpx:"GPX route", src_place:"Place", place_ph:"Town, resort, pass…", place_aria:"Search for a place",
+    use_pos:"Use my location", noplace:"No place chosen yet.", lbl_alt:"Elevation", lbl_dur:"Activity duration", ski:"Ski",
+    ele_hint:"Temperature is computed at this elevation. For skiing, enter the elevation where you'll spend most of your time.",
+    no_result:"No place found.", geo_no:"Location isn't available on this device.", geo_wait:"Locating…",
+    geo_denied:"Location refused or unavailable. Search the place by name.", my_pos:"My location",
+    computing_place:n=>"Getting the weather at "+n+"…", k_slot:"Window", k_until:h=>"until "+h, k_precip:"Snow", hourly:"Hour by hour",
+    th_snow:"Snow", th_cloud:"Clouds", pa_rain:h=>"Rain possible from "+h, pa_storm:h=>"Thunderstorm expected around "+h, pa_frost:t=>"Frost: down to "+t+" °C",
+    pa_gust:g=>"Gusts up to "+g+" km/h", pa_snow:h=>"Snow from "+h, pa_fog:h=>"Fog around "+h, pa_night:"Partly in the dark",
+    place_foot:(m,e)=>`Data <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · model: ${m}${e!=null?" · temperatures computed at "+e+" m":""}. Wind is given 10 m above ground; on ridges it can be much stronger.`,
+    rs_snow:c=>"snow ≈ "+c+" cm", rs_vis:"poor visibility",
     lbl_when:"When", when_fixed:"Fixed time", when_best:"Best window", lbl_day:"Day", lbl_avail:"Availability",
     add_range:"+ Add a time range", from:"From", to:"To", rm_range:"Remove this range", go_best:"Find the best window",
     err_day:"Pick the day of your outing.", err_ranges:"Add at least one time range.",
@@ -463,7 +509,7 @@ const I18N = {
     slot_aria:"Weather score for each possible start time", rs_storm:"thunderstorm", rs_rain:m=>"rain ≈ "+m+" mm", rs_risk:p=>"chance of rain "+p+" %",
     rs_dry:"dry", rs_feel:(a,b)=>"feels "+a+" to "+b+"°", rs_head:v=>"headwind ~"+v+" km/h", rs_tail:v=>"tailwind ~"+v+" km/h",
     rs_gust:g=>"gusts "+g+" km/h", rs_night:p=>"dark "+p+" %",
-    slot_foot:velo=>"Score out of 100 over the whole outing: rain and thunderstorms weigh most, then feels-like temperature (ideal "+(velo?"12 to 24°":"5 to 17°")+"), "+(velo?"headwind":"wind")+" and gusts, and darkness. Tap a bar or a card to see that start in detail.", dplus:"m gain", dminus:"m loss", rd_fail:"Radar unavailable right now.", rd_src:"Radar"
+    slot_foot:a=>a==="ski"?"Score out of 100 over the whole outing: rain and thunderstorms weigh most, then wind and gusts, fog and low cloud, feels-like temperature (ideal −8 to 4°), snowfall and darkness. Tap a bar or a card for details.":"Score out of 100 over the whole outing: rain and thunderstorms weigh most, then feels-like temperature (ideal "+(a==="velo"?"12 to 24°":"5 to 17°")+"), "+(a==="velo"?"headwind":"wind")+" and gusts, and darkness. Tap a bar or a card to see that start in detail.", dplus:"m gain", dminus:"m loss", rd_fail:"Radar unavailable right now.", rd_src:"Radar"
   }
 };
 let LANG = (() => { try { const l = localStorage.getItem("meteo-parcours-lang"); if (l === "fr" || l === "en") return l; } catch(e){} return /^fr/i.test(navigator.language || "fr") ? "fr" : "en"; })();
@@ -471,6 +517,7 @@ const tx = (k, ...a) => { const v = I18N[LANG][k] ?? I18N.fr[k]; return typeof v
 function applyStatic(){
   document.documentElement.lang = LANG;
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = tx(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.setAttribute("placeholder", tx(el.dataset.i18nPh)); });
   document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", tx(el.dataset.i18nAria)); });
   document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === LANG));
 }
@@ -483,9 +530,10 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":
 
 const ACT = {
   velo:  {speed:25, cup:1.5, cdown:0.5, label:"Vélo"},
-  trail: {speed:8,  cup:1.0, cdown:0.0, label:"Trail"}
+  trail: {speed:8,  cup:1.0, cdown:0.0, label:"Trail"},
+  ski:   {speed:4,  cup:1.5, cdown:0.8, label:"Ski"}
 };
-const state = {act:"velo", mode:"speed", when:"fixed", route:null, last:null, slots:null};
+const state = {act:"velo", mode:"speed", when:"fixed", src:"gpx", route:null, place:null, placeRoute:null, last:null, slots:null};
 
 /* ---------- réglages mémorisés ---------- */
 const store = {
@@ -495,13 +543,14 @@ const store = {
 function saveSettings(){
   store.set({act:state.act, mode:state.mode, speed:$("#speed").value, dh:$("#dh").value, dm:$("#dm").value,
     cup:$("#cup").value, cdown:$("#cdown").value, model:$("#model").value, step:$("#step").value,
-    when:state.when, ranges:readRanges().map(r => [r.sa, r.sb]),
+    when:state.when, ranges:readRanges().map(r => [r.sa, r.sb]), src:state.src, place:state.place,
     perAct:{...(store.get().perAct||{}), [state.act]:{speed:$("#speed").value, cup:$("#cup").value, cdown:$("#cdown").value}}});
 }
 function setAct(a, applyDefaults){
   state.act = a;
   $("#act-velo").setAttribute("aria-pressed", a==="velo");
   $("#act-trail").setAttribute("aria-pressed", a==="trail");
+  $("#act-ski").setAttribute("aria-pressed", a==="ski");
   if (applyDefaults){
     const mem = (store.get().perAct||{})[a] || {};
     $("#speed").value = mem.speed ?? ACT[a].speed;
@@ -514,13 +563,13 @@ function setMode(m){
   state.mode = m;
   $("#mode-speed").setAttribute("aria-pressed", m==="speed");
   $("#mode-time").setAttribute("aria-pressed", m==="time");
-  $("#box-speed").hidden = m!=="speed";
-  $("#box-time").hidden = m!=="time";
+  $("#box-speed").hidden = m!=="speed" || state.src === "place";
+  $("#box-time").hidden = m!=="time" && state.src !== "place";
   paceHint();
 }
 function totalMs(){
-  if (!state.route) return null;
-  if (state.mode === "speed"){
+  if (!target()) return null;
+  if (state.mode === "speed" && state.src !== "place"){
     const v = parseFloat($("#speed").value);
     return v > 0 ? state.route.km / v * 3600000 : null;
   }
@@ -529,10 +578,11 @@ function totalMs(){
 }
 function paceHint(){
   const h = $("#pace-hint");
-  if (!state.route){ h.textContent = ""; return; }
+  if (!target()){ h.textContent = ""; return; }
   const T = totalMs();
   if (!T){ h.textContent = tx("need_pace"); return; }
   const start = startTime();
+  if (state.src === "place"){ h.textContent = state.when === "fixed" && start ? tx("arr", fmtDay(start+T), fmtH(start+T)).replace(/^ · /, "") : ""; return; }
   const v = state.route.km / (T/3600000);
   h.textContent = (state.mode==="speed" ? tx("est_dur", fmtDur(T)) : tx("avg_speed", n1(v)))
     + (start ? tx("arr", fmtDay(start+T), fmtH(start+T)) : "");
@@ -678,7 +728,7 @@ function makeSamples(route, times, stepMin){
 }
 
 /* ---------- Open-Meteo ---------- */
-const HV = ["temperature_2m","apparent_temperature","precipitation","precipitation_probability","weather_code","cloud_cover","wind_speed_10m","wind_direction_10m","wind_gusts_10m","is_day"];
+const HV = ["temperature_2m","apparent_temperature","precipitation","precipitation_probability","weather_code","cloud_cover","wind_speed_10m","wind_direction_10m","wind_gusts_10m","is_day","rain","snowfall"];
 const isoDay = t => new Date(t).toISOString().slice(0,10);
 async function fetchWeather(samples, route, model, t0 = samples[0].t, t1 = samples[samples.length-1].t){
   const q = new URLSearchParams({
@@ -712,7 +762,7 @@ function readAt(loc, t){
     rain: pick("precipitation", after), prob: pick("precipitation_probability", after),
     code: pick("weather_code", near), cloud: lin("cloud_cover"),
     wind: lin("wind_speed_10m"), gust: lin("wind_gusts_10m"), wdir: pick("wind_direction_10m", near),
-    day: pick("is_day", near)
+    day: pick("is_day", near), liq: pick("rain", after), snow: pick("snowfall", after)
   };
 }
 const WMO = (c, day) => {
@@ -773,21 +823,26 @@ function dayStart(){
 }
 // Pénalités par point de passage (0 = idéal). Plus le total est bas, meilleur est le créneau.
 function slotPenalty(w, rel, act){
-  const r = w.rain || 0, pr = w.prob || 0, c = w.code ?? 0;
+  const r = w.rain || 0, pr = w.prob || 0, c = w.code ?? 0, g = w.gust || 0, f = w.feel;
   const storm = c >= 95, snow = (c >= 71 && c <= 77) || c === 85 || c === 86, ice = c === 56 || c === 57 || c === 66 || c === 67;
+  if (act === "ski"){
+    const liq = w.liq ?? (snow ? 0 : r), sn = w.snow || 0;
+    const rain = Math.min(60, liq*35) + Math.min(20, sn*5) + pr*0.06 + (storm ? 40 : 0) + (ice ? 25 : 0);
+    const temp = f == null ? 0 : Math.max(0, -8 - f)*1.8 + Math.max(0, f - 4)*1.5;
+    const wind = (w.wind || 0)*0.35 + Math.max(0, g - 40)*0.6;
+    const vis = (c === 45 || c === 48) ? 15 : Math.max(0, (w.cloud || 0) - 85)*0.6;
+    return {rain, temp, wind, vis, night: w.day === 0 ? 20 : 0, storm, fog: vis >= 6};
+  }
   const rain = Math.min(60, r*30) + pr*0.15 + (storm ? 40 : 0) + (snow ? 12 : 0) + (ice ? 25 : 0);
   const [lo, hi] = act === "velo" ? [12, 24] : [5, 17];
-  const f = w.feel;
   const temp = f == null ? 0 : Math.max(0, lo - f)*2.2 + Math.max(0, f - hi)*2.2;
-  const g = w.gust || 0;
   const wind = act === "velo"
-    ? Math.max(0, rel ? rel.head : 0)*0.7 + Math.max(0, g - 45)*0.5
+    ? (rel ? Math.max(0, rel.head)*0.7 : (w.wind || 0)*0.4) + Math.max(0, g - 45)*0.5
     : (w.wind || 0)*0.25 + Math.max(0, g - 55)*0.5;
-  const night = w.day === 0 ? 15 : 0;
-  return {rain, temp, wind, night, storm};
+  return {rain, temp, wind, vis:0, night: w.day === 0 ? 15 : 0, storm, fog:false};
 }
 async function findBest(){
-  const route = state.route, T = totalMs(), d0 = dayStart(), ranges = readRanges();
+  const route = target(), T = totalMs(), d0 = dayStart(), ranges = readRanges();
   if (!route) return;
   if (!T){ showMsg(tx("err_pace"), "err"); return; }
   if (!d0){ showMsg(tx("err_day"), "err"); return; }
@@ -807,29 +862,39 @@ async function findBest(){
   const btn = $("#go"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + tx("loading");
   const out = $("#out");
   if (state.last && $("#chart")) out.classList.add("busy");
-  else out.innerHTML = `<div class="card loading"><span class="spin"></span> ${tx("computing", n1(route.km))}</div>`;
+  else out.innerHTML = `<div class="card loading"><span class="spin"></span> ${route.place ? tx("computing_place", esc(route.mine ? tx("my_pos") : route.name)) : tx("computing", n1(route.km))}</div>`;
   try {
+    let pts = [], locs;
+    if (route.place){
+      // même lieu, découpé dans le temps
+      const K = Math.max(4, Math.min(24, Math.ceil(T/(20*60000)) + 1));
+      for (let k = 0; k < K; k++) pts.push({...placePoint(), f:k/(K-1), loc:0, brg:null});
+      pts.forEach((p, k) => { const a = k ? (pts[k-1].f + p.f)/2 : 0, b = k < K-1 ? (p.f + pts[k+1].f)/2 : 1; p.wt = b - a; });
+      locs = await fetchWeather([placePoint()], route, $("#model").value, tMin, tMax);
+    } else {
     // points répartis le long de la trace, avec leur part du temps total (dénivelé compris)
     const frac = computeTimes(route, 0, 1), ds = route.pts.map(p => p.d);
     const K = Math.max(8, Math.min(20, Math.round(route.km / 2.5)));
-    const pts = [];
     for (let k = 0; k < K; k++){
       const d = route.km * k / (K-1), p = pointAtDist(route, d);
       const i = Math.min(bsearch(ds, d), ds.length-2), f = (d - ds[i]) / ((ds[i+1]-ds[i]) || 1);
       p.f = frac[i] + (frac[i+1]-frac[i])*Math.max(0, Math.min(1, f));
       p.brg = bearing(pointAtDist(route, d-0.4), pointAtDist(route, d+0.4));
+      p.loc = k;
       pts.push(p);
     }
     pts.forEach((p, k) => { const a = k ? (pts[k-1].f + p.f)/2 : 0, b = k < K-1 ? (p.f + pts[k+1].f)/2 : 1; p.wt = b - a; });
-    const locs = await fetchWeather(pts, route, $("#model").value, tMin, tMax);
+    locs = await fetchWeather(pts, route, $("#model").value, tMin, tMax);
+    }
     cands.forEach(c => {
-      let P = {rain:0, temp:0, wind:0, night:0}, rainMax = 0, mm = 0, pmax = 0, fmin = 99, fmax = -99, head = 0, gmax = 0, nightF = 0, storm = false;
+      let P = {rain:0, temp:0, wind:0, vis:0, night:0}, rainMax = 0, cm = 0, fogF = 0, mm = 0, pmax = 0, fmin = 99, fmax = -99, head = 0, gmax = 0, nightF = 0, storm = false;
       pts.forEach((p, k) => {
-        const t = c.start + p.f*T, w = readAt(locs[k] || locs[0], t), rel = relWind({w, brg:p.brg});
+        const t = c.start + p.f*T, w = readAt(locs[p.loc] || locs[0], t), rel = p.brg == null ? null : relWind({w, brg:p.brg});
         const q = slotPenalty(w, rel, state.act);
-        for (const key of ["rain","temp","wind","night"]) P[key] += q[key]*p.wt;
+        for (const key of ["rain","temp","wind","vis","night"]) P[key] += q[key]*p.wt;
+        cm += (w.snow || 0) * p.wt * T/3600000; if (q.fog) fogF += p.wt;
         rainMax = Math.max(rainMax, q.rain);
-        mm += (w.rain || 0) * p.wt * T/3600000;
+        mm += (state.act === "ski" ? (w.liq ?? 0) : (w.rain || 0)) * p.wt * T/3600000;
         pmax = Math.max(pmax, w.prob || 0);
         if (w.feel != null){ fmin = Math.min(fmin, w.feel); fmax = Math.max(fmax, w.feel); }
         head += (rel ? rel.head : 0) * p.wt; gmax = Math.max(gmax, w.gust || 0);
@@ -837,8 +902,8 @@ async function findBest(){
         storm = storm || q.storm;
       });
       P.rain += 0.4*rainMax;   // une seule grosse averse doit compter, même courte
-      c.P = P; c.score = Math.max(0, Math.round(100 - P.rain - P.temp - P.wind - P.night));
-      c.stats = {mm, pmax, fmin, fmax, head, gmax, nightF, storm};
+      c.P = P; c.score = Math.max(0, Math.round(100 - P.rain - P.temp - P.wind - P.vis - P.night));
+      c.stats = {mm, cm, fogF, pmax, fmin, fmax, head, gmax, nightF, storm, place: !!route.place};
     });
     const sorted = cands.slice().sort((a, b) => b.score - a.score || a.start - b.start);
     const top = [];
@@ -859,10 +924,12 @@ function slotReasons(c){
   const s = c.stats, out = [];
   if (s.storm) out.push(tx("rs_storm"));
   if (s.mm >= 0.3) out.push(tx("rs_rain", n1(s.mm)));
-  else if (s.pmax >= 40) out.push(tx("rs_risk", n0(s.pmax)));
+  else if (s.pmax >= 40 && s.cm < 0.5) out.push(tx("rs_risk", n0(s.pmax)));
   else out.push(tx("rs_dry"));
   if (s.fmin < 99) out.push(tx("rs_feel", n0(s.fmin), n0(s.fmax)));
-  if (state.act === "velo"){ if (s.head >= 5) out.push(tx("rs_head", n0(s.head))); else if (s.head <= -5) out.push(tx("rs_tail", n0(-s.head))); }
+  if (s.cm >= 0.5) out.push(tx("rs_snow", n1(s.cm)));
+  if (s.fogF > 0.2) out.push(tx("rs_vis"));
+  if (state.act === "velo" && !s.place){ if (s.head >= 5) out.push(tx("rs_head", n0(s.head))); else if (s.head <= -5) out.push(tx("rs_tail", n0(-s.head))); }
   if (s.gmax >= 50) out.push(tx("rs_gust", n0(s.gmax)));
   if (s.nightF > 0.05) out.push(tx("rs_night", Math.round(s.nightF*100)));
   return out;
@@ -883,7 +950,7 @@ function slotsHTML(L){
     <div class="sec-h"><h3>${tx("best_slot")}</h3><span class="legend">${fmtDay(Sl.d0)} · ${tx("dur")} ${fmtDur(Sl.T)} · ${tx("every_dep")}</span></div>
     <div class="slot-row">${Sl.top.map(card).join("")}</div>
     <div class="chartbox"><svg id="slotchart" role="img" aria-label="${tx("slot_aria")}"></svg><div class="tip" id="slottip" hidden></div></div>
-    <p class="foot" style="margin:10px 0 0">${tx("slot_foot", state.act === "velo")}</p>
+    <p class="foot" style="margin:10px 0 0">${tx("slot_foot", state.act)}</p>
   </section>`;
 }
 function drawSlots(L){
@@ -940,9 +1007,127 @@ function pickSlot(t){
   run();
 }
 
+/* ---------- mode lieu (sans GPX) ---------- */
+const EMPTY_OUT = $("#out").innerHTML;
+const target = () => state.src === "place" ? state.placeRoute : state.route;
+const isPlace = L => !!(L && L.route && L.route.place);
+function setSrc(src){
+  state.src = src;
+  $("#src-gpx").setAttribute("aria-pressed", src === "gpx");
+  $("#src-place").setAttribute("aria-pressed", src === "place");
+  $("#box-gpx").hidden = src !== "gpx";
+  $("#box-place").hidden = src !== "place";
+  // en mode lieu, seule la durée compte
+  $("#pace-seg").hidden = src === "place";
+  $("#lbl-pace").textContent = tx(src === "place" ? "lbl_dur" : "lbl_pace");
+  $("#box-speed").hidden = src === "place" || state.mode !== "speed";
+  $("#box-time").hidden = !(src === "place" || state.mode === "time");
+  $("#adv-elev").hidden = src === "place";
+  $("#go").disabled = !target();
+  paceHint();
+}
+function setPlace(p, silent){
+  state.place = p;
+  state.placeRoute = p ? {place:true, mine:!!p.mine, name:p.name, sub:p.sub || "", lat:p.lat, lon:p.lon, ele:p.ele, hasEle:p.ele != null, km:0, pts:[]} : null;
+  $("#placeinfo").innerHTML = p ? `<b>${esc(p.mine ? tx("my_pos") : p.name)}</b>${p.sub ? "<br>" + esc(p.sub) : ""}<br>${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}` : `<span>${tx("noplace")}</span>`;
+  if (p && p.ele != null) $("#placeele").value = Math.round(p.ele);
+  $("#go").disabled = !target();
+  try { const s = store.get(); s.place = p; store.set(s); } catch(e){}
+  paceHint();
+  if (!silent && p) (state.when === "best" ? findBest() : run());
+}
+function placePoint(){ const r = state.placeRoute; return {lat:r.lat, lon:r.lon, ele:r.ele, d:0}; }
+let _geo = null;
+async function geoSearch(q){
+  const box = $("#placeres");
+  if (q.trim().length < 2){ box.hidden = true; return; }
+  try {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=6&language=${LANG}&format=json`);
+    const j = await r.json(), res = (j && j.results) || [];
+    if (!res.length){ box.innerHTML = `<p class="hint" style="margin:8px 0">${tx("no_result")}</p>`; box.hidden = false; return; }
+    box.innerHTML = res.map((p, i) => `<button type="button" data-i="${i}"><b>${esc(p.name)}</b><span>${esc([p.admin1, p.country].filter(Boolean).join(", "))}${p.elevation != null ? " · " + Math.round(p.elevation) + " m" : ""}</span></button>`).join("");
+    box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      const p = res[+b.dataset.i];
+      box.hidden = true; $("#placeq").value = p.name;
+      setPlace({name:p.name, sub:[p.admin1, p.country].filter(Boolean).join(", "), lat:p.latitude, lon:p.longitude, ele:p.elevation ?? null});
+    }));
+    box.hidden = false;
+  } catch(e){ box.innerHTML = `<p class="hint" style="margin:8px 0">${tx("err_net")}</p>`; box.hidden = false; }
+}
+function geoLocate(){
+  if (!navigator.geolocation){ $("#placeinfo").textContent = tx("geo_no"); return; }
+  $("#placeinfo").innerHTML = `<span class="spin"></span> ${tx("geo_wait")}`;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    let ele = pos.coords.altitude ?? null;
+    try { const r = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`); const j = await r.json(); if (j.elevation && j.elevation[0] != null) ele = j.elevation[0]; } catch(e){}
+    setPlace({name:"", mine:true, sub:"", lat, lon, ele});
+  }, () => { $("#placeinfo").textContent = tx("geo_denied"); }, {enableHighAccuracy:false, timeout:12000, maximumAge:600000});
+}
+async function runPlace(start, T){
+  const R = state.placeRoute, end = start + T;
+  const step = T <= 3*3600000 ? 15 : T <= 8*3600000 ? 30 : 60, list = [];
+  for (let t = start; t < end - step*60000*0.3; t += step*60000) list.push(t);
+  list.push(end);
+  const locs = await fetchWeather([placePoint()], R, $("#model").value, start, end);
+  const samples = list.map(t => ({...placePoint(), t, w: readAt(locs[0], t), rel:null}));
+  state.last = {route:R, samples, step, start, end};
+  renderPlace(state.last);
+}
+const COMPASS = {fr:["N","NE","E","SE","S","SO","O","NO"], en:["N","NE","E","SE","S","SW","W","NW"]};
+const compass = d => d == null ? "" : COMPASS[LANG][Math.round(((d % 360) + 360) % 360 / 45) % 8];
+function renderPlace(L){
+  const {route:R, samples:S, step, start, end} = L;
+  const temps = S.map(s => s.w.temp).filter(v => v != null), feels = S.map(s => s.w.feel).filter(v => v != null);
+  const tmin = Math.min(...temps), tmax = Math.max(...temps);
+  let mm = 0, cm = 0;
+  S.forEach((s, i) => { const dt = (i < S.length-1 ? S[i+1].t - s.t : 0)/3600000; mm += (state.act === "ski" ? (s.w.liq ?? s.w.rain ?? 0) : (s.w.rain || 0))*dt; cm += (s.w.snow || 0)*dt; });
+  const probMax = Math.max(0, ...S.map(s => s.w.prob || 0));
+  const windMax = Math.max(0, ...S.map(s => s.w.wind || 0)), gustMax = Math.max(0, ...S.map(s => s.w.gust || 0));
+  const alerts = [];
+  const liqOf = s => state.act === "ski" ? (s.w.liq ?? 0) : (s.w.rain || 0);
+  const snowy = S.find(s => (s.w.snow || 0) >= 0.2);
+  if (snowy) alerts.push(`<span class="chip cold">${tx("pa_snow", fmtH(snowy.t))}</span>`);
+  const wet = S.find(s => liqOf(s) >= 0.2 || ((s.w.prob || 0) >= 50 && (s.w.snow || 0) < 0.1));
+  if (wet) alerts.push(`<span class="chip rain">${tx("pa_rain", fmtH(wet.t))}</span>`);
+  const storm = S.find(s => (s.w.code || 0) >= 95);
+  if (storm) alerts.push(`<span class="chip head">${tx("pa_storm", fmtH(storm.t))}</span>`);
+  if (tmin <= 0 && state.act !== "ski") alerts.push(`<span class="chip cold">${tx("pa_frost", n1(tmin))}</span>`);
+  if (gustMax >= 50) alerts.push(`<span class="chip head">${tx("pa_gust", n0(gustMax))}</span>`);
+  const fog = S.find(s => s.w.code === 45 || s.w.code === 48);
+  if (fog) alerts.push(`<span class="chip night">${tx("pa_fog", fmtH(fog.t))}</span>`);
+  if (S.some(s => s.w.day === 0)) alerts.push(`<span class="chip night">${tx("pa_night")}</span>`);
+  if (!alerts.length) alerts.push(`<span class="chip">${tx("a_none")}</span>`);
+  const showSnow = state.act === "ski" || cm > 0.05;
+  const rel = reliability(start);
+  const modelName = $("#model").selectedOptions[0].textContent;
+  $("#out").innerHTML = slotsHTML(L) + `
+    <div class="routehead"><h2>${esc(R.mine ? tx("my_pos") : R.name)}</h2><span>${R.sub ? esc(R.sub) + " · " : ""}${R.ele != null ? n0(R.ele) + " m · " : ""}${fmtDay(start)} ${fmtH(start)} → ${fmtH(end)}</span></div>
+    <section class="stats" aria-label="${tx("summary")}">
+      <div class="stat"><div class="k">${tx("k_slot")}</div><div class="v">${fmtH(start)}</div><div class="s">${tx("k_until", fmtH(end))} · ${fmtDur(end-start)} <span class="reli">${rel}</span></div></div>
+      <div class="stat"><div class="k">${tx("k_temp")}</div><div class="v">${n0(tmin)}°<small> / ${n0(tmax)}°</small></div><div class="s">${tx("feel_min")} ${n0(Math.min(...feels))}°</div></div>
+      <div class="stat"><div class="k">${showSnow ? tx("k_precip") : tx("k_rain")}</div><div class="v">${showSnow ? n1(cm) + "<small> cm</small>" : n1(mm) + "<small> mm</small>"}</div><div class="s">${showSnow ? tx("rain_w") + " " + n1(mm) + " mm · " : ""}${tx("prob_max")} ${n0(probMax)} %</div></div>
+      <div class="stat"><div class="k">${tx("k_wind")}</div><div class="v">${n0(windMax)}<small> km/h</small></div><div class="s">${tx("gusts")} ${n0(gustMax)} km/h</div></div>
+    </section>
+    <div class="alerts">${alerts.join("")}</div>
+    <section class="card">
+      <div class="sec-h"><h3>${tx("hourly")}</h3><span class="legend">${tx("every", step)}</span></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>${tx("th")[1]}</th><th>${tx("th")[3]}</th><th>${tx("th")[4]}</th><th>${tx("th")[5]}</th><th>${tx("th")[6]}</th>${showSnow ? `<th>${tx("th_snow")}</th>` : ""}<th>${tx("th")[7]}</th><th>${tx("th")[8]}</th><th>${tx("th")[9]}</th><th>${tx("th_cloud")}</th></tr></thead>
+        <tbody>${S.map(s => { const [lab, ico] = WMO(s.w.code, s.w.day); const wetR = (s.w.rain || 0) >= 0.2 || (s.w.prob || 0) >= 50;
+          return `<tr class="${wetR ? "wet" : ""} ${s.w.day === 0 ? "isnight" : ""}"><td>${fmtH(s.t)}</td><td>${ico} ${lab}</td><td>${n1(s.w.temp)}°</td><td>${n1(s.w.feel)}°</td>
+            <td>${n1(showSnow ? (s.w.liq ?? s.w.rain) : s.w.rain)} mm</td>${showSnow ? `<td>${n1(s.w.snow || 0)} cm</td>` : ""}<td>${n0(s.w.prob)} %</td>
+            <td>${n0(s.w.wind)} km/h ${compass(s.w.wdir)}</td><td>${n0(s.w.gust)}</td><td>${n0(s.w.cloud)} %</td></tr>`; }).join("")}</tbody>
+      </table></div>
+    </section>
+    <p class="foot">${tx("place_foot", esc(modelName), R.ele != null ? n0(R.ele) : null)}</p>`;
+  drawSlots(L);
+}
+const renderAny = L => isPlace(L) ? renderPlace(L) : render(L);
+
 /* ---------- run ---------- */
 async function run(){
-  const route = state.route, start = startTime(), T = totalMs();
+  const route = target(), start = startTime(), T = totalMs();
   if (!route) return;
   if (!start){ showMsg(tx("err_start"), "err"); return; }
   if (!T){ showMsg(tx("err_pace"), "err"); return; }
@@ -952,9 +1137,10 @@ async function run(){
   saveSettings();
   const btn = $("#go"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + tx("loading");
   const out = $("#out");
-  if (state.last && $("#chart")) out.classList.add("busy");
-  else out.innerHTML = `<div class="card loading"><span class="spin"></span> ${tx("computing", n1(route.km))}</div>`;
+  if (state.last && $(".stats")) out.classList.add("busy");
+  else out.innerHTML = `<div class="card loading"><span class="spin"></span> ${route.place ? tx("computing_place", esc(route.mine ? tx("my_pos") : route.name)) : tx("computing", n1(route.km))}</div>`;
   try {
+    if (route.place){ await runPlace(start, T); return; }
     const times = computeTimes(route, start, T);
     const {step, list} = makeSamples(route, times, $("#step").value === "auto" ? "auto" : parseInt($("#step").value,10));
     const locs = await fetchWeather(list, route, $("#model").value);
@@ -1280,7 +1466,7 @@ function drawChart(L){
   svg.addEventListener("pointerleave", () => { tip.hidden = true; cur.setAttribute("visibility", "hidden"); });
 }
 let _rz = null;
-window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(() => { if (state.last && $("#chart")){ drawChart(state.last); drawSlots(state.last); } }, 150); });
+window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(() => { if (state.last){ if ($("#chart")) drawChart(state.last); drawSlots(state.last); } }, 150); });
 
 /* ---------- carte ---------- */
 const OSM_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -1550,18 +1736,26 @@ drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) l
 $("#demo").addEventListener("click", () => { setRoute(demoRoute()); run(); });
 $("#act-velo").addEventListener("click", () => { saveSettings(); setAct("velo", true); });
 $("#act-trail").addEventListener("click", () => { saveSettings(); setAct("trail", true); });
+$("#act-ski").addEventListener("click", () => { saveSettings(); setAct("ski", true); });
+$("#src-gpx").addEventListener("click", () => { setSrc("gpx"); saveSettings(); state.last = null; $("#out").innerHTML = EMPTY_OUT; applyStatic(); if (state.route) (state.when === "best" ? findBest() : run()); });
+$("#src-place").addEventListener("click", () => { setSrc("place"); saveSettings(); state.last = null; if (state.placeRoute) (state.when === "best" ? findBest() : run()); else { $("#out").innerHTML = EMPTY_OUT; applyStatic(); $("#placeq").focus(); } });
+$("#placeq").addEventListener("input", e => { clearTimeout(_geo); _geo = setTimeout(() => geoSearch(e.target.value), 300); });
+$("#placeq").addEventListener("keydown", e => { if (e.key === "Escape") $("#placeres").hidden = true; if (e.key === "Enter"){ e.preventDefault(); const b = $("#placeres button"); if (b) b.click(); } });
+document.addEventListener("click", e => { if (!e.target.closest(".placesearch")) $("#placeres").hidden = true; });
+$("#geoloc").addEventListener("click", geoLocate);
+$("#placeele").addEventListener("change", () => { if (!state.place) return; const v = parseFloat($("#placeele").value); setPlace({...state.place, ele: isFinite(v) ? v : null}, true); autoRun(); });
 $("#mode-speed").addEventListener("click", () => setMode("speed"));
 $("#mode-time").addEventListener("click", () => setMode("time"));
 ["speed","dh","dm","start","cup","cdown"].forEach(id => $("#"+id).addEventListener("input", paceHint));
 $("#go").addEventListener("click", () => state.when === "best" ? findBest() : run());
 let _auto = null;
-const autoRun = () => { if (!state.route || !state.last) return; clearTimeout(_auto); _auto = setTimeout(() => state.when === "best" ? findBest() : run(), 700); };
+const autoRun = () => { if (!target() || !state.last) return; clearTimeout(_auto); _auto = setTimeout(() => state.when === "best" ? findBest() : run(), 700); };
 ["speed","dh","dm","cup","cdown","day"].forEach(id => $("#"+id).addEventListener("change", autoRun));
 $("#start").addEventListener("change", () => { if (state.when === "fixed") autoRun(); });
 ["model","step"].forEach(id => $("#"+id).addEventListener("change", autoRun));
-["act-velo","act-trail","mode-speed","mode-time"].forEach(id => $("#"+id).addEventListener("click", autoRun));
-$("#when-fixed").addEventListener("click", () => { setWhen("fixed"); saveSettings(); if (state.last) render(state.last); });
-$("#when-best").addEventListener("click", () => { setWhen("best"); saveSettings(); if (state.route && state.last) findBest(); });
+["act-velo","act-trail","act-ski","mode-speed","mode-time"].forEach(id => $("#"+id).addEventListener("click", autoRun));
+$("#when-fixed").addEventListener("click", () => { setWhen("fixed"); saveSettings(); if (state.last) renderAny(state.last); });
+$("#when-best").addEventListener("click", () => { setWhen("best"); saveSettings(); if (target() && state.last) findBest(); });
 $("#addrange").addEventListener("click", () => { addRange("17:00", "21:00"); saveSettings(); });
 $("#out").addEventListener("change", e => {
   if (!map || !layers || !state.last) return;
@@ -1577,7 +1771,9 @@ function setLang(l){
   applyStatic(); routeUI(); paceHint();
   goLabel();
   document.querySelectorAll("#ranges .range").forEach(r => { const [a, b] = r.querySelectorAll("input"); a.setAttribute("aria-label", tx("from")); b.setAttribute("aria-label", tx("to")); r.querySelector(".rm").setAttribute("aria-label", tx("rm_range")); });
-  if (state.last && $("#chart")) render(state.last);
+  if (state.place) setPlace(state.place, true);
+  setSrc(state.src);
+  if (state.last && $(".stats")) renderAny(state.last);
 }
 document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => setLang(b.dataset.lang)));
 
@@ -1595,11 +1791,13 @@ if (saved.dh) $("#dh").value = saved.dh;
 if (saved.dm) $("#dm").value = saved.dm;
 if (saved.model) $("#model").value = saved.model;
 if (saved.step) $("#step").value = saved.step;
-setAct(saved.act || "velo", !saved.act);
+setAct(ACT[saved.act] ? saved.act : "velo", !saved.act);
 if (saved.cup) $("#cup").value = saved.cup;
 if (saved.cdown) $("#cdown").value = saved.cdown;
 setMode(saved.mode || "speed");
 setWhen(saved.when === "best" ? "best" : "fixed");
+if (saved.place && isFinite(saved.place.lat)) setPlace(saved.place, true);
+setSrc(saved.src === "place" ? "place" : "gpx");
 })();
 </script>
 </body>
